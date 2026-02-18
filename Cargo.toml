@@ -1,6 +1,5 @@
 [workspace]
 resolver = "2"
 members = [
-    "apps/stock",  # <--- Dodaj tę linię (lub upewnij się, że masz "apps/*")
-    "crates/*"
+    "apps/stock"
 ]

@@ -5,7 +5,7 @@ type: 'application'
 
 toolchain:
   rust:
-    version: '1.75.0' # Opcjonalnie, jeśli chcesz nadpisać wersję globalną
+    version: 'stable'
 
 tasks:
   build:

@@ -4,7 +4,7 @@ $schema: './cache/schemas/toolchain.json'
 # extends: './shared/toolchain.yml'
 
 rust:
-  version: '1.92.0'
+  version: 'stable'
   bins: []
   components:
     - 'clippy'
