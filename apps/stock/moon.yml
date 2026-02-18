@@ -1,0 +1,30 @@
+# apps/moj-serwer/moon.yml
+
+language: 'rust'
+type: 'application'
+
+toolchain:
+  rust:
+    version: '1.75.0' # Opcjonalnie, jeśli chcesz nadpisać wersję globalną
+
+tasks:
+  build:
+    command: 'cargo build'
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+    outputs:
+      - 'target/debug/moj-serwer' # Ścieżka do pliku wykonywalnego
+
+  run:
+    command: 'cargo run'
+    local: true # To zadanie interaktywne (np. serwer WWW), nie cache'uj go w CI
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+
+  test:
+    command: 'cargo test'
+    inputs:
+      - 'src/**/*'
+      - 'tests/**/*'
