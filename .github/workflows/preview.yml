@@ -1,0 +1,60 @@
+name: Front Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: preview-front-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      WORKER_NAME: front-pr-${{ github.event.number }}
+      PREVIEW_URL: https://front-pr-${{ github.event.number }}.${{ vars.WORKERS_DEV_SUBDOMAIN }}.workers.dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build front app with Turborepo
+        run: pnpm turbo run build --filter=front
+
+      - name: Deploy preview Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/front
+          command: deploy --name ${{ env.WORKER_NAME }}
+
+      - name: Add sticky PR comment with preview link
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cloudflare-preview-front
+          message: |
+            Preview środowiska front zostało zaktualizowane.
+
+            URL: [${{ env.PREVIEW_URL }}](${{ env.PREVIEW_URL }})

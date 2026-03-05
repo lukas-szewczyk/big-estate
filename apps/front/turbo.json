@@ -9,6 +9,12 @@
                 "dist/**"
             ]
         },
+        "deploy": {
+            "dependsOn": ["^build"],
+            "outputs": [
+                "dist/**"
+            ]
+        },
         "dev": {
             "persistent": true
         }
