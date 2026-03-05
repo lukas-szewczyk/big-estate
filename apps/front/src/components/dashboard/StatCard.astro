@@ -1,0 +1,18 @@
+---
+interface Props {
+  label: string;
+  value: string;
+  description: string;
+  descriptionColor?: string;
+}
+
+const { label, value, description, descriptionColor = "var(--muted-foreground)" } = Astro.props;
+---
+
+<div class="flex flex-col flex-1 rounded-none bg-[var(--card)] border border-[var(--border)] overflow-hidden">
+  <div class="flex flex-col gap-2 p-6">
+    <span class="font-secondary text-[var(--muted-foreground)] text-[12px]">{label}</span>
+    <span class="font-primary text-[var(--card-foreground)] text-[40px] font-bold leading-none">{value}</span>
+    <span class="font-secondary text-[12px]" style={`color: ${descriptionColor}`}>{description}</span>
+  </div>
+</div>

@@ -1,0 +1,55 @@
+---
+interface NavItem {
+  icon: string;
+  label: string;
+  active?: boolean;
+}
+
+const navItems: NavItem[] = [
+  { icon: "explore", label: "Rover Dashboard", active: true },
+  { icon: "inventory_2", label: "Rental Fleet" },
+  { icon: "handyman", label: "Maintenance" },
+  { icon: "query_stats", label: "Diagnostics" },
+  { icon: "notifications", label: "Alerts" },
+];
+---
+
+<aside class="flex flex-col w-[224px] h-full bg-[var(--sidebar)] border-r border-[var(--sidebar-border)]">
+  <!-- Header -->
+  <div class="flex items-center h-[76px] px-4 border-b border-[var(--sidebar-border)]">
+    <div class="flex items-center gap-2">
+      <svg class="w-4 h-4 fill-[var(--primary)]" viewBox="0 0 32 32">
+        <path d="M16 0c8.83656 0 16 7.16344 16 16 0 8.83656-7.16344 16-16 16-8.83656 0-16-7.16344-16-16 0-8.83656 7.16344-16 16-16z m1.86035 8.71777c-0.66585-1.68829-3.05485-1.68829-3.7207 0l-1.21485 3.08008c-0.20329 0.51544-0.61151 0.92366-1.12695 1.12695l-3.08008 1.21485c-1.68829 0.66585-1.68829 3.05485 0 3.7207l3.08008 1.21485c0.51544 0.20329 0.92366 0.61151 1.12695 1.12695l1.21485 3.08008c0.66585 1.68829 3.05485 1.68829 3.7207 0l1.21485-3.08008c0.20329-0.51544 0.61151-0.92366 1.12695-1.12695l3.08008-1.21485c1.68829-0.66585 1.68829-3.05485 0-3.7207l-3.08008-1.21485c-0.51544-0.20329-0.92366-0.61151-1.12695-1.12695l-1.21485-3.08008z" />
+      </svg>
+      <span class="font-primary text-[var(--primary)] text-[12px] font-bold leading-none">LUNARIS</span>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="flex flex-col flex-1 px-3 py-4">
+    <div class="px-2 py-2">
+      <span class="font-primary text-[var(--sidebar-foreground)] text-[11px] leading-none">Operations</span>
+    </div>
+    {navItems.map((item) => (
+      <a
+        href="#"
+        class:list={[
+          "flex items-center gap-2 px-2 py-2 rounded-full text-[var(--sidebar-foreground)]",
+          item.active && "bg-[var(--sidebar-accent)]",
+        ]}
+      >
+        <span class="material-icon text-[16px] text-[var(--sidebar-foreground)]" style="font-weight: 100;">{item.icon}</span>
+        <span class="font-secondary text-[12px] leading-none">{item.label}</span>
+      </a>
+    ))}
+  </nav>
+
+  <!-- Footer -->
+  <div class="flex items-center gap-2 px-4 py-4 border-t border-[var(--sidebar-border)]">
+    <div class="flex flex-col flex-1 gap-1">
+      <span class="font-secondary text-[var(--sidebar-foreground)] text-[11px] leading-none">Joe Doe</span>
+      <span class="font-secondary text-[var(--muted-foreground)] text-[10px] leading-none">joe@acmecorp.com</span>
+    </div>
+    <span class="material-icon text-[14px] text-[var(--sidebar-foreground)]" style="font-weight: 100;">keyboard_arrow_down</span>
+  </div>
+</aside>
