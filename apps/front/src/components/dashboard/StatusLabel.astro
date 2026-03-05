@@ -1,0 +1,34 @@
+---
+interface Props {
+  status: "available" | "charging" | "queued";
+}
+
+const { status } = Astro.props;
+
+const config = {
+  available: {
+    text: "Available",
+    bg: "var(--color-success)",
+    color: "var(--color-success-foreground)",
+  },
+  charging: {
+    text: "Charging",
+    bg: "var(--secondary)",
+    color: "var(--secondary-foreground)",
+  },
+  queued: {
+    text: "Queued",
+    bg: "var(--color-warning)",
+    color: "var(--color-warning-foreground)",
+  },
+};
+
+const c = config[status];
+---
+
+<span
+  class="inline-flex items-center justify-center gap-1 rounded-full px-2 py-0.5 font-primary text-[10px] leading-[1.14]"
+  style={`background-color: ${c.bg}; color: ${c.color};`}
+>
+  {c.text}
+</span>

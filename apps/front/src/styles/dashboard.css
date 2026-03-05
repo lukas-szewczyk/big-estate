@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f4f2;
+  --foreground: #222222;
+  --card: #fbfbfa;
+  --card-foreground: #222222;
+  --border: #d9d9d5;
+  --muted: #ecece8;
+  --muted-foreground: #7c7c76;
+  --primary: #ff8400;
+  --primary-foreground: #1f1f1f;
+  --secondary: #ebebe7;
+  --secondary-foreground: #54544f;
+  --sidebar: #efefec;
+  --sidebar-accent: #dfdfda;
+  --sidebar-foreground: #4c4c47;
+  --sidebar-border: #d7d7d1;
+  --sidebar-primary: #efefec;
+  --sidebar-primary-foreground: #4c4c47;
+  --color-success: #def0e6;
+  --color-success-foreground: #2f7545;
+  --color-warning: #f4e5d6;
+  --color-warning-foreground: #9a682f;
+  --input: #f8f8f6;
+  --ring: #bdbdb5;
+  --radius-pill: 999px;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .font-primary {
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .font-secondary {
+    font-family: "Geist", sans-serif;
+  }
+
+  .material-icon {
+    font-family: "Material Symbols Sharp";
+    font-weight: 100;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+  }
+}
