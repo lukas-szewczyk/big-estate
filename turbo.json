@@ -19,6 +19,7 @@
     },
     "deploy": {
       "dependsOn": ["^build"],
+      "env": ["CLOUDFLARE_API_TOKEN"],
       "outputs": [
         "dist/**"
       ]
