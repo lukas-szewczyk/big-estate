@@ -1,0 +1,89 @@
+name: Deploy Axum to Hetzner
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - apps/server-axum/**
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy-server-axum-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CONTAINER_NAME: server-axum
+      AXUM_PORT: "3000"
+      HOST_PORT: "80"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute image coordinates
+        id: vars
+        shell: bash
+        run: |
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY,,}/server-axum"
+          echo "image_repo=$IMAGE_REPO" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR (push)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/server-axum
+          file: ./apps/server-axum/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_repo }}:${{ steps.vars.outputs.sha_tag }}
+            ${{ steps.vars.outputs.image_repo }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Deploy to Hetzner VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_REPO: ${{ steps.vars.outputs.image_repo }}
+          IMAGE_TAG: ${{ steps.vars.outputs.sha_tag }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          HOST_PORT: ${{ env.HOST_PORT }}
+          AXUM_PORT: ${{ env.AXUM_PORT }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          envs: IMAGE_REPO,IMAGE_TAG,CONTAINER_NAME,HOST_PORT,AXUM_PORT,GHCR_USERNAME,GHCR_PAT
+          script: |
+            set -euo pipefail
+
+            echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            docker pull "$IMAGE_REPO:$IMAGE_TAG"
+
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p "$HOST_PORT:$AXUM_PORT" \
+              "$IMAGE_REPO:$IMAGE_TAG"
+
+            docker image prune -af --filter "until=168h"
