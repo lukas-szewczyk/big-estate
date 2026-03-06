@@ -76,6 +76,7 @@ jobs:
           host: ${{ vars.VPS_HOST }}
           username: ${{ vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           script_stop: true
           envs: IMAGE_REPO,IMAGE_TAG,CONTAINER_NAME,HOST_PORT,AXUM_PORT,GHCR_USERNAME,GHCR_PAT
           script: |
