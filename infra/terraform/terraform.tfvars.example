@@ -1,0 +1,5 @@
+hcloud_token   = "replace-me"
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... replace-me"
+
+# Tighten this to your own IP if possible.
+allowed_ssh_cidrs = ["0.0.0.0/0", "::/0"]

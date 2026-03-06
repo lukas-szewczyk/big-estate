@@ -1,4 +1,4 @@
-name: Deploy Axum to Hetzner
+name: Deploy server-axum
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - apps/server-axum/**
+      - .github/workflows/deploy-axum.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,6 +28,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run tests
+        working-directory: apps/server-axum
+        run: cargo test --locked
 
       - name: Compute image coordinates
         id: vars
@@ -51,8 +60,6 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.image_repo }}:${{ steps.vars.outputs.sha_tag }}
             ${{ steps.vars.outputs.image_repo }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           provenance: false
 
       - name: Deploy to Hetzner VPS via SSH
@@ -66,8 +73,8 @@ jobs:
           GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
           GHCR_PAT: ${{ secrets.GHCR_PAT }}
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script_stop: true
           envs: IMAGE_REPO,IMAGE_TAG,CONTAINER_NAME,HOST_PORT,AXUM_PORT,GHCR_USERNAME,GHCR_PAT
@@ -77,13 +84,10 @@ jobs:
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
             docker pull "$IMAGE_REPO:$IMAGE_TAG"
 
-            docker stop "$CONTAINER_NAME" || true
-            docker rm "$CONTAINER_NAME" || true
+            docker rm -f "$CONTAINER_NAME" || true
 
             docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
               -p "$HOST_PORT:$AXUM_PORT" \
               "$IMAGE_REPO:$IMAGE_TAG"
-
-            docker image prune -af --filter "until=168h"
