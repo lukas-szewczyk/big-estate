@@ -2,19 +2,33 @@
   "name": "god",
   "private": true,
   "scripts": {
+    "bootstrap-admin": "turbo run bootstrap-admin --filter=server-axum",
     "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "db:down": "turbo run db-down --filter=@repo/dev-tools",
+    "db:logs": "turbo run db-logs --filter=@repo/dev-tools",
+    "db:reset": "turbo run db-reset --filter=@repo/dev-tools",
+    "db:up": "turbo run db-up --filter=@repo/dev-tools",
+    "deploy:front": "turbo run deploy --filter=front",
     "dev": "turbo run dev",
+    "dev:front": "turbo run dev --filter=front",
+    "dev:server": "turbo run dev --filter=server-axum",
+    "format": "prettier --write \"apps/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"packages/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"infra/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \".github/workflows/**/*.{yml,yaml}\" \"*.{json,md,yaml,yml}\"",
+    "format:check": "prettier --check \"apps/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"packages/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"infra/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \".github/workflows/**/*.{yml,yaml}\" \"*.{json,md,yaml,yml}\"",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "migrate": "turbo run migrate --filter=server-axum",
+    "test": "turbo run test",
+    "verify": "turbo run lint check-types test build",
+    "verify:affected": "turbo run lint check-types test build --affected"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
     "turbo": "^2.8.10",
     "typescript": "5.9.2"
   },
-  "packageManager": "pnpm@9.0.0",
   "engines": {
-    "node": ">=18"
-  }
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.0.0"
 }

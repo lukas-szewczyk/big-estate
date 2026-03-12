@@ -1,14 +1,73 @@
-use axum::{
-    routing::get,
-    Router,
-};
+use std::io;
+
+use server_axum::{bootstrap, build_app, create_state, Config, MIGRATOR};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[derive(Clone, Copy, Debug)]
+enum Command {
+    Serve,
+    Migrate,
+    BootstrapAdmin,
+}
 
 #[tokio::main]
-async fn main() {
-    // build our application with a single route
-    let app = Router::new().route("/", get(|| async { "Hello, World!!!" }));
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    dotenvy::dotenv().ok();
+    init_tracing();
 
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let command = parse_command()?;
+    let config = Config::from_env().map_err(io::Error::other)?;
+    let state = create_state(config.clone())
+        .await
+        .map_err(io::Error::other)?;
+
+    match command {
+        Command::Serve => {
+            MIGRATOR.run(&state.db).await?;
+            bootstrap::ensure_bootstrap_admin(&state.db, &config)
+                .await
+                .map_err(io::Error::other)?;
+
+            let address = config.socket_addr().map_err(io::Error::other)?;
+            let app = build_app(state).map_err(io::Error::other)?;
+            let listener = tokio::net::TcpListener::bind(address).await?;
+
+            tracing::info!(address = %address, "server-axum listening");
+            axum::serve(listener, app).await?;
+        }
+        Command::Migrate => {
+            MIGRATOR.run(&state.db).await?;
+            tracing::info!("database migrations completed");
+        }
+        Command::BootstrapAdmin => {
+            MIGRATOR.run(&state.db).await?;
+            bootstrap::ensure_bootstrap_admin(&state.db, &config)
+                .await
+                .map_err(io::Error::other)?;
+            tracing::info!("bootstrap admin command completed");
+        }
+    }
+
+    Ok(())
+}
+
+fn parse_command() -> Result<Command, io::Error> {
+    match std::env::args().nth(1).as_deref() {
+        None | Some("serve") => Ok(Command::Serve),
+        Some("migrate") => Ok(Command::Migrate),
+        Some("bootstrap-admin") => Ok(Command::BootstrapAdmin),
+        Some(other) => Err(io::Error::other(format!(
+            "unknown command {other}; expected serve, migrate, or bootstrap-admin"
+        ))),
+    }
+}
+
+fn init_tracing() {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,tower_http=info".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 }

@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - apps/**
+      - packages/**
+      - .github/workflows/ci.yml
+      - compose.yaml
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - turbo.json
+  push:
+    branches:
+      - main
+    paths:
+      - apps/**
+      - packages/**
+      - .github/workflows/ci.yml
+      - compose.yaml
+      - package.json
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - turbo.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: god
+          POSTGRES_USER: god
+          POSTGRES_PASSWORD: god
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U god -d god"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      API_SERVER_BASE_URL: http://localhost:3000
+      AUTH_COOKIE_SECURE: "false"
+      DATABASE_URL: postgres://god:god@127.0.0.1:5432/god
+      FRONTEND_ORIGIN: http://localhost:4321
+      PUBLIC_API_BASE_URL: http://localhost:3000
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            apps/server-axum/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/server-axum/Cargo.lock') }}
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend migrations
+        run: pnpm migrate
+
+      - name: Run affected monorepo checks
+        if: github.event_name == 'pull_request'
+        run: pnpm verify:affected
+
+      - name: Run full monorepo checks
+        if: github.event_name != 'pull_request'
+        run: pnpm verify

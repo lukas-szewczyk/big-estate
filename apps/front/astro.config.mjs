@@ -1,4 +1,5 @@
 // @ts-check
+import "dotenv/config";
 import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
@@ -6,12 +7,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 import cloudflare from "@astrojs/cloudflare";
 
-// https://astro.build/config
 export default defineConfig({
-  site: "https://example.com",
+  site: process.env.SITE_URL || "http://localhost:4321",
   integrations: [mdx(), sitemap()],
   vite: {
-    // @ts-expect-error - vite version mismatch in monorepo
     plugins: [tailwindcss()],
   },
   adapter: cloudflare({

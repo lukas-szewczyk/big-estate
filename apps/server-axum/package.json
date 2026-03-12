@@ -1,9 +1,15 @@
 {
   "name": "server-axum",
   "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "dev": "cargo run",
-    "build": "cargo build --release",
-    "test": "cargo test"
+    "bootstrap-admin": "cargo run --locked -- bootstrap-admin",
+    "build": "cargo build --release --locked",
+    "check-types": "cargo check --locked --all-targets",
+    "dev": "sh -c 'if command -v cargo-watch >/dev/null 2>&1; then cargo watch -x run; else cargo run --locked; fi'",
+    "lint": "cargo fmt --all --check && cargo clippy --locked --all-targets --all-features -- -D warnings",
+    "migrate": "cargo run --locked -- migrate",
+    "start": "cargo run --locked",
+    "test": "sh -c 'DATABASE_URL=${DATABASE_URL:-postgres://god:god@127.0.0.1:5432/god} cargo test --locked'"
   }
 }

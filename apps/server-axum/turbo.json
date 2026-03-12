@@ -1,0 +1,26 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "bootstrap-admin": {
+      "cache": false
+    },
+    "build": {
+      "outputs": ["target/release/**"]
+    },
+    "check-types": {
+      "outputs": [
+        "target/debug/.fingerprint/**",
+        "target/debug/build/**",
+        "target/debug/deps/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "migrate": {
+      "cache": false
+    }
+  }
+}

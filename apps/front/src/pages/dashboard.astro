@@ -1,8 +1,18 @@
 ---
+export const prerender = false;
+
 import "../styles/dashboard.css";
 import Sidebar from "../components/dashboard/Sidebar.astro";
 import StatCard from "../components/dashboard/StatCard.astro";
 import RoverTable from "../components/dashboard/RoverTable.astro";
+import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
+
+const authUser = await getSessionUser(Astro.request, Astro.locals);
+if (!authUser) {
+  return Astro.redirect("/login");
+}
+
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
 ---
 
 <!doctype html>
@@ -12,8 +22,6 @@ import RoverTable from "../components/dashboard/RoverTable.astro";
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Rover Command Center | LUNARIS</title>
-
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -27,50 +35,73 @@ import RoverTable from "../components/dashboard/RoverTable.astro";
   </head>
   <body class="h-full bg-[var(--background)]">
     <div class="flex h-full w-full overflow-hidden">
-      <!-- Sidebar -->
       <Sidebar />
 
-      <!-- Main Content -->
-      <main class="flex flex-col flex-1 h-full gap-6 p-8 overflow-auto bg-[var(--background)]">
-        <!-- Header -->
-        <div class="flex items-center justify-between gap-4 w-full">
-          <div class="flex flex-col flex-1 gap-1">
-            <h1 class="font-primary text-[var(--foreground)] text-[36px] leading-none font-semibold">Rover Command Center</h1>
-            <p class="font-secondary text-[var(--muted-foreground)] text-[12px] leading-[1.5]">Monitor fleet readiness, utilization, and rental availability in real time.</p>
+      <main class="flex h-full flex-1 flex-col gap-6 overflow-auto bg-[var(--background)] p-8">
+        <div class="flex w-full flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div class="flex flex-1 flex-col gap-3">
+            <div class="inline-flex w-fit items-center gap-2 border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+              <span class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Authenticated session</span>
+              <span class="font-secondary text-xs text-[var(--secondary-foreground)]">{authUser.email} · {authUser.role}</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <h1 class="font-primary text-[var(--foreground)] text-[36px] leading-none font-semibold">Rover Command Center</h1>
+              <p class="font-secondary text-[12px] leading-[1.6] text-[var(--muted-foreground)]">Monitor fleet readiness, utilization, and rental availability in real time through a protected Axum-backed session.</p>
+            </div>
           </div>
-          <div class="flex gap-3">
-            <button class="flex items-center justify-center gap-[6px] h-[32px] px-4 rounded-full bg-[var(--background)] border border-[var(--border)]">
-              <span class="font-primary text-[var(--foreground)] text-[11px] font-medium leading-none text-center">View Missions</span>
+
+          <div class="flex flex-wrap gap-3">
+            <button class="flex h-[32px] items-center justify-center gap-[6px] rounded-full border border-[var(--border)] bg-[var(--background)] px-4">
+              <span class="font-primary text-center text-[11px] leading-none font-medium text-[var(--foreground)]">View Missions</span>
             </button>
-            <button class="flex items-center justify-center gap-[6px] h-[32px] px-4 rounded-full bg-[var(--primary)]">
-              <span class="font-primary text-[var(--primary-foreground)] text-[11px] font-medium leading-none text-center">Deploy Rover</span>
+            <button class="flex h-[32px] items-center justify-center gap-[6px] rounded-full bg-[var(--primary)] px-4">
+              <span class="font-primary text-center text-[11px] leading-none font-medium text-[var(--primary-foreground)]">Deploy Rover</span>
+            </button>
+            <button
+              class="flex h-[32px] items-center justify-center gap-[6px] rounded-full border border-[var(--border)] bg-[var(--card)] px-4"
+              type="button"
+              data-logout-button
+            >
+              <span class="font-primary text-center text-[11px] leading-none font-medium text-[var(--foreground)]">Sign out</span>
             </button>
           </div>
         </div>
 
-        <!-- Stat Cards -->
-        <div class="flex gap-4 w-full">
-          <StatCard
-            label="Active Rovers"
-            value="18"
-            description="4 currently deployed"
-          />
+        <div class="flex w-full gap-4 max-lg:flex-col">
+          <StatCard label="Active Rovers" value="18" description="4 currently deployed" />
           <StatCard
             label="Rental Utilization"
             value="82%"
             description="Up 5% vs last week"
             descriptionColor="var(--color-success-foreground)"
           />
-          <StatCard
-            label="Charge-ready"
-            value="12"
-            description="Fully charged spares"
-          />
+          <StatCard label="Charge-ready" value="12" description="Fully charged spares" />
         </div>
 
-        <!-- Rover Fleet Table -->
         <RoverTable />
       </main>
     </div>
+
+    <script is:inline define:vars={{ apiBaseUrl }}>
+      const logoutButton = document.querySelector("[data-logout-button]");
+
+      logoutButton?.addEventListener("click", async () => {
+        if (!(logoutButton instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        logoutButton.disabled = true;
+        logoutButton.textContent = "Signing out...";
+
+        try {
+          await fetch(`${apiBaseUrl}/auth/logout`, {
+            method: "POST",
+            credentials: "include",
+          });
+        } finally {
+          window.location.assign("/login");
+        }
+      });
+    </script>
   </body>
 </html>

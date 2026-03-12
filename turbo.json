@@ -1,28 +1,58 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "API_SERVER_BASE_URL",
+    "AUTH_COOKIE_DOMAIN",
+    "AUTH_COOKIE_SECURE",
+    "BOOTSTRAP_ADMIN_EMAIL",
+    "BOOTSTRAP_ADMIN_PASSWORD",
+    "DATABASE_URL",
+    "FRONTEND_ORIGIN",
+    "POSTGRES_DB",
+    "POSTGRES_PASSWORD",
+    "POSTGRES_PORT",
+    "POSTGRES_USER",
+    "PUBLIC_API_BASE_URL",
+    "SITE_URL"
+  ],
+  "globalDependencies": ["pnpm-lock.yaml", "compose.yaml", ".env*", "**/.env*"],
   "tasks": {
+    "bootstrap-admin": {
+      "cache": false
+    },
     "build": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**", "target/release/server-axum", "target/debug/server-axum"]
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "**/.env*"]
     },
     "check-types": {
       "dependsOn": ["^check-types"]
+    },
+    "db-down": {
+      "cache": false
+    },
+    "db-logs": {
+      "cache": false,
+      "persistent": true
+    },
+    "db-reset": {
+      "cache": false
+    },
+    "db-up": {
+      "cache": false
+    },
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["build"]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "deploy": {
-      "dependsOn": ["^build"],
-      "env": ["CLOUDFLARE_API_TOKEN"],
-      "outputs": [
-        "dist/**"
-      ]
-    }
+    "lint": {},
+    "migrate": {
+      "cache": false
+    },
+    "test": {}
   }
 }

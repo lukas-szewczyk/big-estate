@@ -35,9 +35,11 @@ Repository secrets:
 - `VPS_SSH_KEY`: private key matching `ssh_public_key`
 - `GHCR_USERNAME`: GitHub username that owns the package token
 - `GHCR_PAT`: GitHub personal access token with package read access
+- `SERVER_ENV_FILE`: full `.env` contents passed to the container during deploy
 
 ## Deploy flow
 
 1. Push changes to `main` touching `apps/server-axum/**`.
-2. GitHub Actions runs `cargo test`, builds the Docker image from `apps/server-axum/Dockerfile`, and pushes it to GHCR.
-3. The workflow connects to the Hetzner server over SSH, pulls the new image, and restarts the container.
+2. GitHub Actions runs `cargo fmt --check`, `cargo clippy`, `cargo test`, then builds the Docker image from `apps/server-axum/Dockerfile` and pushes it to GHCR.
+3. The workflow connects to the Hetzner server over SSH, writes `/opt/server-axum/.env` from `SERVER_ENV_FILE`, pulls the new image, and restarts the container.
+4. The deploy finishes only after the container reports a healthy `/health` endpoint.
