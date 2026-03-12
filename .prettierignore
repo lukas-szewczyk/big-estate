@@ -1,0 +1,4 @@
+apps/front/.astro
+apps/front/dist
+apps/front/worker-configuration.d.ts
+apps/server-axum/target

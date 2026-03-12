@@ -1,0 +1,181 @@
+---
+export const prerender = false;
+
+import "../styles/dashboard.css";
+import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
+
+const authUser = await getSessionUser(Astro.request, Astro.locals);
+if (authUser) {
+  return Astro.redirect("/dashboard");
+}
+
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
+---
+
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Login | LUNARIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Geist:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-full bg-[var(--background)] text-[var(--foreground)]">
+    <main class="relative isolate flex min-h-full items-center justify-center overflow-hidden px-6 py-10 sm:px-10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,0,0.22),_transparent_32%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(239,239,236,0.92))]"></div>
+      <div class="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,132,0,0.65),transparent)]"></div>
+      <div class="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(76,76,71,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(76,76,71,0.05)_1px,transparent_1px)] [background-size:36px_36px]"></div>
+
+      <section class="relative grid w-full max-w-5xl overflow-hidden border border-[var(--border)] bg-[rgba(251,251,250,0.9)] shadow-[0_30px_80px_rgba(31,31,31,0.08)] backdrop-blur md:grid-cols-[1.15fr_0.85fr]">
+        <div class="flex flex-col justify-between gap-12 border-b border-[var(--border)] p-8 md:border-b-0 md:border-r md:p-10">
+          <div class="space-y-6">
+            <p class="font-primary text-[11px] uppercase tracking-[0.38em] text-[var(--muted-foreground)]">LUNARIS access</p>
+            <div class="space-y-4">
+              <h1 class="max-w-xl font-primary text-4xl leading-none text-[var(--foreground)] sm:text-5xl">
+                Mission control starts with a verified operator.
+              </h1>
+              <p class="max-w-lg font-secondary text-sm leading-6 text-[var(--secondary-foreground)] sm:text-base">
+                Sign in to review fleet readiness, launch orders, and protected operational data from a single secured dashboard.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-3">
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Cookie model</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">HttpOnly session cookie managed by Axum.</p>
+            </div>
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Access scope</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">Admin-only user APIs behind the same auth boundary.</p>
+            </div>
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Runtime</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">Astro SSR on Cloudflare with a private Axum origin.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center bg-[rgba(244,244,242,0.75)] p-6 sm:p-8 md:p-10">
+          <div class="w-full space-y-6">
+            <div class="space-y-2">
+              <p class="font-primary text-[11px] uppercase tracking-[0.24em] text-[var(--muted-foreground)]">Operator login</p>
+              <h2 class="font-primary text-2xl text-[var(--foreground)]">Sign in</h2>
+              <p class="font-secondary text-sm leading-6 text-[var(--secondary-foreground)]">Use your existing credentials. Access is granted after the backend validates the password and issues a session.</p>
+            </div>
+
+            <form class="space-y-4" data-login-form>
+              <div class="space-y-2">
+                <label class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]" for="email">Email</label>
+                <input
+                  class="h-12 w-full border border-[var(--border)] bg-[var(--card)] px-4 font-secondary text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)]"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  placeholder="admin@example.com"
+                />
+              </div>
+
+              <div class="space-y-2">
+                <label class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]" for="password">Password</label>
+                <input
+                  class="h-12 w-full border border-[var(--border)] bg-[var(--card)] px-4 font-secondary text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)]"
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  placeholder="••••••••••••"
+                />
+              </div>
+
+              <p class="hidden border border-[#d48b8b] bg-[#fff2f1] px-4 py-3 font-secondary text-sm text-[#8a3131]" data-login-error></p>
+
+              <button
+                class="flex h-12 w-full items-center justify-center bg-[var(--primary)] px-4 font-primary text-[11px] uppercase tracking-[0.22em] text-[var(--primary-foreground)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                type="submit"
+                data-submit-button
+              >
+                Sign in
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script is:inline define:vars={{ apiBaseUrl }}>
+      const form = document.querySelector("[data-login-form]");
+      const errorBox = document.querySelector("[data-login-error]");
+      const submitButton = document.querySelector("[data-submit-button]");
+
+      form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!(form instanceof HTMLFormElement) || !(submitButton instanceof HTMLButtonElement)) {
+          return;
+        }
+
+        const formData = new FormData(form);
+        const payload = {
+          email: String(formData.get("email") ?? ""),
+          password: String(formData.get("password") ?? ""),
+        };
+
+        if (errorBox instanceof HTMLElement) {
+          errorBox.textContent = "";
+          errorBox.classList.add("hidden");
+        }
+
+        submitButton.disabled = true;
+        submitButton.textContent = "Signing in...";
+
+        try {
+          const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            window.location.assign("/dashboard");
+            return;
+          }
+
+          let message = "Sign-in failed. Check your credentials and try again.";
+          try {
+            const body = await response.json();
+            if (body?.error?.message) {
+              message = body.error.message;
+            }
+          } catch {
+            // fall back to the generic message
+          }
+
+          if (errorBox instanceof HTMLElement) {
+            errorBox.textContent = message;
+            errorBox.classList.remove("hidden");
+          }
+        } catch {
+          if (errorBox instanceof HTMLElement) {
+            errorBox.textContent = "Authentication service is unavailable right now.";
+            errorBox.classList.remove("hidden");
+          }
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "Sign in";
+        }
+      });
+    </script>
+  </body>
+</html>

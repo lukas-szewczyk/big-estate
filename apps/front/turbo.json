@@ -1,22 +1,20 @@
 {
-    "$schema": "https://turborepo.dev/schema.json",
-    "extends": [
-        "//"
-    ],
-    "tasks": {
-        "build": {
-            "outputs": [
-                "dist/**"
-            ]
-        },
-        "deploy": {
-            "dependsOn": ["^build"],
-            "outputs": [
-                "dist/**"
-            ]
-        },
-        "dev": {
-            "persistent": true
-        }
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": ["PUBLIC_API_BASE_URL", "SITE_URL"],
+      "outputs": ["dist/**"]
+    },
+    "check-types": {
+      "outputs": [".astro/**", "worker-configuration.d.ts"]
+    },
+    "deploy": {
+      "env": ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN", "SITE_URL"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
     }
+  }
 }

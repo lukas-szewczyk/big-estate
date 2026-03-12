@@ -1,44 +1,47 @@
 {
-	"name": "front",
-	"version": "1.0.0",
-	"description": "Build a personal website, blog, or portfolio with Astro.",
-	"cloudflare": {
-		"label": "Astro Framework Starter",
-		"products": [
-			"Workers"
-		],
-		"categories": [],
-		"preview_icon_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/394ca3c9-d351-4036-035a-9f6dfa26dd00/public",
-		"preview_image_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/f40a6577-eed5-4f3e-cef4-b5ef0a1be100/preview",
-		"publish": true
-	},
-	"dependencies": {
-		"@astrojs/cloudflare": "12.6.12",
-		"@astrojs/mdx": "4.3.13",
-		"@astrojs/rss": "4.0.14",
-		"@astrojs/sitemap": "3.6.1",
-		"@tailwindcss/vite": "^4.2.1",
-		"astro": "5.16.9",
-		"tailwindcss": "^4.2.1",
-		"typescript": "5.9.3"
-	},
-	"devDependencies": {
-		"@types/node": "^25.3.2",
-		"wrangler": "^4.69.0"
-	},
-	"engines": {
-		"node": ">=22"
-	},
-	"private": true,
-	"scripts": {
-		"astro": "astro",
-		"build": "astro build",
-		"check-types": "astro check && tsc --noEmit",
-		"cf-typegen": "wrangler types",
-		"deploy": "wrangler deploy",
-		"dev": "astro dev --port 4321",
-		"lint": "astro check",
-		"preview": "astro build && wrangler dev"
-	},
-	"type": "module"
+  "name": "front",
+  "version": "1.0.0",
+  "description": "Astro frontend deployed to Cloudflare Workers.",
+  "private": true,
+  "type": "module",
+  "cloudflare": {
+    "label": "Astro Framework Starter",
+    "products": [
+      "Workers"
+    ],
+    "categories": [],
+    "preview_icon_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/394ca3c9-d351-4036-035a-9f6dfa26dd00/public",
+    "preview_image_url": "https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/f40a6577-eed5-4f3e-cef4-b5ef0a1be100/preview",
+    "publish": true
+  },
+  "scripts": {
+    "astro": "astro",
+    "build": "astro build",
+    "cf-typegen": "wrangler types ./worker-configuration.d.ts --config wrangler.jsonc",
+    "check-types": "wrangler types ./worker-configuration.d.ts --config wrangler.jsonc && astro check && tsc --noEmit",
+    "deploy": "wrangler deploy --config wrangler.jsonc",
+    "dev": "astro dev --host --port 4321",
+    "lint": "astro check",
+    "preview": "astro build && wrangler dev --local --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "12.6.12",
+    "@astrojs/mdx": "4.3.13",
+    "@astrojs/rss": "4.0.14",
+    "@astrojs/sitemap": "3.6.1",
+    "@tailwindcss/vite": "^4.2.1",
+    "astro": "5.16.9",
+    "tailwindcss": "^4.2.1",
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.7",
+    "@cloudflare/workers-types": "^4.20260305.0",
+    "@types/node": "^25.3.2",
+    "dotenv": "^17.3.1",
+    "wrangler": "^4.69.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
 }

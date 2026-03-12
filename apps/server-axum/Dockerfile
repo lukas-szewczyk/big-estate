@@ -3,7 +3,7 @@
 FROM rust:slim-bookworm AS chef
 WORKDIR /app
 
-# cargo-chef for dependency layer caching
+# cargo-chef keeps dependency compilation in a reusable layer.
 RUN cargo install cargo-chef --locked
 
 FROM chef AS planner
@@ -19,7 +19,7 @@ RUN cargo build --release --locked --bin server-axum
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --create-home --uid 10001 appuser
 
@@ -28,6 +28,10 @@ COPY --from=builder /app/target/release/server-axum /usr/local/bin/server-axum
 
 USER appuser
 EXPOSE 3000
+ENV APP_HOST=0.0.0.0
+ENV APP_PORT=3000
 ENV RUST_LOG=info
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${APP_PORT:-3000}/health" || exit 1
 
 ENTRYPOINT ["/usr/local/bin/server-axum"]
