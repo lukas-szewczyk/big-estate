@@ -1,3 +1,22 @@
+# god
+
+## Local Postgres With Docker
+
+1. Copy `.env.example` to `.env`.
+2. Start Postgres with `pnpm db:up`.
+3. Tail logs with `pnpm db:logs`.
+4. Stop everything with `pnpm db:down`.
+
+Default local connection string:
+
+```sh
+postgresql://postgres:postgres@localhost:5432/god
+```
+
+The Docker service is defined in `compose.yaml` and persists data in the named volume `postgres-data`.
+
+---
+
 # Turborepo starter
 
 This Turborepo starter is maintained by the Turborepo core team.

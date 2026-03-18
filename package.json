@@ -3,6 +3,9 @@
   "private": true,
   "scripts": {
     "build": "turbo run build",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:up": "docker compose up -d postgres",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
