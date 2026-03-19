@@ -1,26 +1,67 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: god-postgres
-    restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-god}
-      POSTGRES_USER: ${POSTGRES_USER:-god}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-god}
+  autobase-console-api:
+    image: autobase/console_api:2.5.2
+    container_name: autobase-console-api
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-god} -d ${POSTGRES_DB:-god}",
-        ]
+      test: ["CMD", "curl", "-fsS",
+            "-H", "accept: application/json",
+            "-H", "Authorization: Bearer ${AUTH_TOKEN}",
+            "http://localhost:8080/api/v1/version"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+    restart: unless-stopped
+    depends_on:
+      autobase-console-db:
+        condition: service_healthy
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/ansible:/tmp/ansible
+    environment:
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN}
+      - PG_CONSOLE_LOGGER_LEVEL=${PG_CONSOLE_LOGGER_LEVEL:-INFO}
+      - PG_CONSOLE_DB_HOST=autobase-console-db
+    networks:
+      - autobase
+
+  autobase-console-ui:
+    image: autobase/console_ui:2.5.2
+    container_name: autobase-console-ui
+    ports:
+      - 80:80
+    healthcheck:
+      test: [ "CMD", "curl", "http://localhost:80/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    depends_on:
+      autobase-console-api:
+        condition: service_healthy
+    environment:
+      - PG_CONSOLE_AUTHORIZATION_TOKEN=${AUTH_TOKEN}
+      - PG_CONSOLE_API_HOST=autobase-console-api
+    networks:
+      - autobase
+
+  autobase-console-db:
+    image: autobase/console_db:2.5.2
+    container_name: autobase-console-db
+    healthcheck:
+      test: pg_isready -U postgres -h 127.0.0.1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - console_postgres:/var/lib/postgresql
+    networks:
+      - autobase
 
 volumes:
-  postgres-data:
+  console_postgres:
+    name: console_postgres
+
+networks:
+  autobase:
+    name: autobase
