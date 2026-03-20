@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      API_SERVER_BASE_URL: http://localhost:3000
+      AUTH_COOKIE_SECURE: "false"
+      DATABASE_URL: postgres://god:god@127.0.0.1:5432/god
+      FRONTEND_ORIGIN: http://localhost:4321
+      PUBLIC_API_BASE_URL: http://localhost:3000
+      SITE_URL: http://localhost:4321
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: god
+          POSTGRES_PASSWORD: god
+          POSTGRES_USER: god
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U god -d god"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check types
+        run: pnpm check-types
+
+      - name: Build
+        run: pnpm build
+
+      - name: Backend auth tests
+        run: pnpm --filter server-axum test

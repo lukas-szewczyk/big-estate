@@ -1,0 +1,96 @@
+---
+import BaseHead from "../BaseHead.astro";
+import AuthScreen from "./AuthScreen";
+
+interface LinkItem {
+  href: string;
+  label: string;
+}
+
+interface Props {
+  actionHref: string;
+  actionLabel: string;
+  actionLinkLabel: string;
+  apiBaseUrl: string;
+  busyLabel: string;
+  cardWidthClassName: string;
+  endpoint: string;
+  footerLinks: LinkItem[];
+  footerNote: string;
+  isRegister: boolean;
+  kicker: string;
+  note: string;
+  pageDescription: string;
+  pageTitle: string;
+  primaryActionLabel: string;
+  screenTitle: string;
+  secondaryActionHref: string;
+  secondaryActionLabel: string;
+  subtitle: string;
+  successPath: string;
+}
+
+const {
+  actionHref,
+  actionLabel,
+  actionLinkLabel,
+  apiBaseUrl,
+  busyLabel,
+  cardWidthClassName,
+  endpoint,
+  footerLinks,
+  footerNote,
+  isRegister,
+  kicker,
+  note,
+  pageDescription,
+  pageTitle,
+  primaryActionLabel,
+  screenTitle,
+  secondaryActionHref,
+  secondaryActionLabel,
+  subtitle,
+  successPath,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <BaseHead title={pageTitle} description={pageDescription} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-full bg-background text-foreground">
+    <AuthScreen
+      actionHref={actionHref}
+      actionLabel={actionLabel}
+      actionLinkLabel={actionLinkLabel}
+      apiBaseUrl={apiBaseUrl}
+      busyLabel={busyLabel}
+      cardWidthClassName={cardWidthClassName}
+      endpoint={endpoint}
+      footerLinks={footerLinks}
+      footerNote={footerNote}
+      isRegister={isRegister}
+      kicker={kicker}
+      note={note}
+      pageTitle={screenTitle}
+      primaryActionLabel={primaryActionLabel}
+      secondaryActionHref={secondaryActionHref}
+      secondaryActionLabel={secondaryActionLabel}
+      subtitle={subtitle}
+      successPath={successPath}
+    />
+
+    <script>
+      import { mountAuthForm } from "../../scripts/auth-form";
+
+      mountAuthForm();
+    </script>
+  </body>
+</html>

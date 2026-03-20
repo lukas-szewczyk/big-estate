@@ -21,12 +21,18 @@ use crate::{
     config::normalize_email,
     error::ApiError,
     models::{PublicUser, UserRole},
-    users::find_user_by_email,
+    users::{create_user, find_user_by_email},
     AppState,
 };
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegisterRequest {
     email: String,
     password: String,
 }
@@ -60,6 +66,27 @@ pub async fn login_handler(
 
     verify_password(&payload.password, &user.password_hash)?;
 
+    let cookie = create_session_cookie(&state, user.id).await?;
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    append_cookie(&mut response, &cookie)?;
+    Ok(response)
+}
+
+pub async fn register_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<RegisterRequest>,
+) -> Result<Response, ApiError> {
+    let user = create_user(&state.db, &payload.email, &payload.password, UserRole::User).await?;
+    let cookie = create_session_cookie(&state, user.id).await?;
+    let mut response = (StatusCode::CREATED, Json(user.public())).into_response();
+    append_cookie(&mut response, &cookie)?;
+    Ok(response)
+}
+
+async fn create_session_cookie(
+    state: &AppState,
+    user_id: i64,
+) -> Result<Cookie<'static>, ApiError> {
     let session_token = generate_session_token();
     let session_token_hash = hash_session_token(&session_token);
     let expires_at =
@@ -71,16 +98,14 @@ pub async fn login_handler(
         VALUES ($1, $2, $3)
         "#,
     )
-    .bind(user.id)
+    .bind(user_id)
     .bind(&session_token_hash)
     .bind(expires_at)
     .execute(&state.db)
     .await?;
 
-    let cookie = build_session_cookie(&state, &session_token);
-    let mut response = StatusCode::NO_CONTENT.into_response();
-    append_cookie(&mut response, &cookie)?;
-    Ok(response)
+    let cookie = build_session_cookie(state, &session_token);
+    Ok(cookie)
 }
 
 pub async fn logout_handler(

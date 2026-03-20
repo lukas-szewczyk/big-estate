@@ -1,0 +1,40 @@
+---
+export const prerender = false;
+
+import AuthPage from "../components/auth/AuthPage.astro";
+import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
+
+const authUser = await getSessionUser(Astro.request, Astro.locals);
+if (authUser) {
+  return Astro.redirect("/dashboard");
+}
+
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
+---
+
+<AuthPage
+  actionHref="/login"
+  actionLabel="Already have an account?"
+  actionLinkLabel="Sign in instead"
+  apiBaseUrl={apiBaseUrl}
+  busyLabel="Creating account..."
+  cardWidthClassName="max-w-[28.75rem]"
+  endpoint="/auth/register"
+  footerLinks={[
+    { href: "#", label: "Help" },
+    { href: "#", label: "Privacy" },
+    { href: "#", label: "Terms" },
+  ]}
+  footerNote="English (United States)"
+  isRegister={true}
+  kicker="CREATE ACCOUNT"
+  note="By continuing, you confirm this account will be used for personal access across your workspace."
+  pageDescription="Create a personal LUNARIS account and continue straight into the protected dashboard."
+  pageTitle="Register | LUNARIS"
+  primaryActionLabel="Create account"
+  screenTitle="Create your account"
+  secondaryActionHref="/login"
+  secondaryActionLabel="Sign in instead"
+  subtitle="Set up one account for mail, documents, meetings, and everything you use every day."
+  successPath="/dashboard"
+/>

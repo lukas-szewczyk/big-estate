@@ -48,6 +48,7 @@ pub fn build_app(state: AppState) -> Result<Router, ApiError> {
         .route("/", get(root_handler))
         .route("/health", get(health_handler))
         .route("/auth/login", post(auth::login_handler))
+        .route("/auth/register", post(auth::register_handler))
         .route("/auth/logout", post(auth::logout_handler))
         .route("/auth/me", get(auth::me_handler))
         .route(

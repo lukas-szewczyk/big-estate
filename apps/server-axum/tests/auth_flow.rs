@@ -69,6 +69,23 @@ async fn login_cookie(email: &str, password: &str) -> String {
     cookie_value(&response)
 }
 
+async fn register_user(email: &str, password: &str) -> axum::response::Response {
+    let state = create_state(test_config()).await.unwrap();
+    let app = build_app(state).unwrap();
+    app.oneshot(
+        http::Request::builder()
+            .method(http::Method::POST)
+            .uri("/auth/register")
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .body(axum::body::Body::from(
+                serde_json::json!({ "email": email, "password": password }).to_string(),
+            ))
+            .unwrap(),
+    )
+    .await
+    .unwrap()
+}
+
 async fn authenticated_cookie(pool: &PgPool, role: UserRole) -> String {
     let email = format!("{}@example.com", role.as_str());
     let password = "secret-password";
@@ -76,6 +93,56 @@ async fn authenticated_cookie(pool: &PgPool, role: UserRole) -> String {
         .await
         .unwrap();
     login_cookie(&user.email, password).await
+}
+
+#[tokio::test]
+#[serial]
+async fn register_success_sets_cookie_and_me_returns_user() {
+    let pool = test_pool().await;
+
+    let register_response = register_user("new@example.com", "secret-password").await;
+
+    assert_eq!(register_response.status(), http::StatusCode::CREATED);
+    let cookie = cookie_value(&register_response);
+    let user: serde_json::Value = json_body(register_response).await;
+    assert_eq!(user["email"], "new@example.com");
+    assert_eq!(user["role"], "user");
+
+    let stored_user = users::find_user_by_email(&pool, "new@example.com")
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored_user.role, UserRole::User);
+
+    let state = create_state(test_config()).await.unwrap();
+    let app = build_app(state).unwrap();
+    let me_response = app
+        .oneshot(
+            http::Request::builder()
+                .method(http::Method::GET)
+                .uri("/auth/me")
+                .header(http::header::COOKIE, cookie)
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(me_response.status(), http::StatusCode::OK);
+    let me_user: serde_json::Value = json_body(me_response).await;
+    assert_eq!(me_user["email"], "new@example.com");
+    assert_eq!(me_user["role"], "user");
+}
+
+#[tokio::test]
+#[serial]
+async fn register_duplicate_email_conflicts() {
+    let _pool = test_pool().await;
+    let first_response = register_user("new@example.com", "secret-password").await;
+    assert_eq!(first_response.status(), http::StatusCode::CREATED);
+
+    let duplicate_response = register_user("new@example.com", "secret-password").await;
+    assert_eq!(duplicate_response.status(), http::StatusCode::CONFLICT);
 }
 
 #[tokio::test]

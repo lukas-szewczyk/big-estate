@@ -32,3 +32,13 @@ https://developers.cloudflare.com/workers/runtime-apis/nodejs/
 
 Retrieve API references and limits from:
 `/kv/` · `/r2/` · `/d1/` · `/durable-objects/` · `/queues/` · `/vectorize/` · `/workers-ai/` · `/agents/`
+
+## Auth Design-to-Code Contract
+
+- Treat `design.pen` as the source of truth for auth UX before changing `/login` or `/register`.
+- Current route mapping is fixed: `dT0Ca` -> `/login`, `m1uNU` -> `/register`.
+- If auth copy or structure changes, update both the Astro implementation and `AUTH_FLOW.md` in the same slice.
+- Keep `/` as a redirect-only route. Do not reintroduce a full auth page there.
+- Reuse the existing auth shell and shadcn primitives in `src/components/auth` before creating new auth-specific markup.
+- Do not invent a new visual direction for auth in code. If the desired UI differs from Pencil, update Pencil first or in the same task.
+- In summaries, PR notes, or review comments for auth work, include the Pencil frame IDs you matched against.
