@@ -1,308 +1,184 @@
 ---
-import BaseHead from '../components/BaseHead.astro';
-import Header from '../components/Header.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+export const prerender = false;
+
+import "../styles/dashboard.css";
+import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
+import BaseHead from "../components/BaseHead.astro";
+import { SITE_TITLE, SITE_DESCRIPTION } from "../consts";
+
+const authUser = await getSessionUser(Astro.request, Astro.locals);
+if (authUser) {
+  return Astro.redirect("/dashboard");
+}
+
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
 ---
 
 <!doctype html>
-<html lang="en">
-	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-		<style>
-			.homepage {
-				width: min(980px, calc(100% - 2rem));
-				margin: 2.5rem auto;
-				padding: 1.5rem;
-				border-radius: 8px;
-				background: #fff;
-				border: 1px solid rgba(var(--gray-light), 0.95);
-			}
+<html lang="en" class="h-full">
+  <head>
+    <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Login | LUNARIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Geist:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-full bg-[var(--background)] text-[var(--foreground)]">
+    <main class="relative isolate flex min-h-full items-center justify-center overflow-hidden px-6 py-10 sm:px-10">
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,132,0,0.22),_transparent_32%),linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(239,239,236,0.92))]"></div>
+      <div class="absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,132,0,0.65),transparent)]"></div>
+      <div class="absolute inset-0 opacity-50 [background-image:linear-gradient(rgba(76,76,71,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(76,76,71,0.05)_1px,transparent_1px)] [background-size:36px_36px]"></div>
 
-			.heading {
-				margin-bottom: 1.5rem;
-			}
+      <section class="relative grid w-full max-w-5xl overflow-hidden border border-[var(--border)] bg-[rgba(251,251,250,0.9)] shadow-[0_30px_80px_rgba(31,31,31,0.08)] backdrop-blur md:grid-cols-[1.15fr_0.85fr]">
+        <div class="flex flex-col justify-between gap-12 border-b border-[var(--border)] p-8 md:border-b-0 md:border-r md:p-10">
+          <div class="space-y-6">
+            <p class="font-primary text-[11px] uppercase tracking-[0.38em] text-[var(--muted-foreground)]">LUNARIS access</p>
+            <div class="space-y-4">
+              <h1 class="max-w-xl font-primary text-4xl leading-none text-[var(--foreground)] sm:text-5xl">
+                Mission control starts with a verified operator.
+              </h1>
+              <p class="max-w-lg font-secondary text-sm leading-6 text-[var(--secondary-foreground)] sm:text-base">
+                Sign in to review fleet readiness, launch orders, and protected operational data from a single secured dashboard.
+              </p>
+            </div>
+          </div>
 
-			.heading h1 {
-				font-size: 1.1rem;
-				margin-bottom: 0.4rem;
-			}
+          <div class="grid gap-4 sm:grid-cols-3">
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Cookie model</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">HttpOnly session cookie managed by Axum.</p>
+            </div>
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Access scope</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">Admin-only user APIs behind the same auth boundary.</p>
+            </div>
+            <div class="border border-[var(--border)] bg-[var(--card)] p-4">
+              <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Runtime</p>
+              <p class="mt-3 font-secondary text-sm leading-6 text-[var(--foreground)]">Astro SSR on Cloudflare with a private Axum origin.</p>
+            </div>
+          </div>
+        </div>
 
-			.heading p {
-				margin: 0;
-				color: rgb(var(--gray));
-				font-size: 0.85rem;
-			}
+        <div class="flex items-center bg-[rgba(244,244,242,0.75)] p-6 sm:p-8 md:p-10">
+          <div class="w-full space-y-6">
+            <div class="space-y-2">
+              <p class="font-primary text-[11px] uppercase tracking-[0.24em] text-[var(--muted-foreground)]">Operator login</p>
+              <h2 class="font-primary text-2xl text-[var(--foreground)]">Sign in</h2>
+              <p class="font-secondary text-sm leading-6 text-[var(--secondary-foreground)]">Use your existing credentials. Access is granted after the backend validates the password and issues a session.</p>
+            </div>
 
-			.filter-grid {
-				display: grid;
-				grid-template-columns: repeat(3, minmax(0, 1fr));
-				gap: 0.85rem 0.9rem;
-				margin-bottom: 1.15rem;
-			}
+            <form class="space-y-4" data-login-form>
+              <div class="space-y-2">
+                <label class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]" for="email">Email</label>
+                <input
+                  class="h-12 w-full border border-[var(--border)] bg-[var(--card)] px-4 font-secondary text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)]"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autocomplete="email"
+                  required
+                  placeholder="admin@example.com"
+                />
+              </div>
 
-			.field {
-				display: grid;
-				gap: 0.35rem;
-			}
+              <div class="space-y-2">
+                <label class="font-primary text-[11px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]" for="password">Password</label>
+                <input
+                  class="h-12 w-full border border-[var(--border)] bg-[var(--card)] px-4 font-secondary text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)]"
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  required
+                  placeholder="••••••••••••"
+                />
+              </div>
 
-			.field label {
-				font-size: 0.7rem;
-				color: rgb(var(--gray-dark));
-				font-weight: 600;
-			}
+              <p class="hidden border border-[#d48b8b] bg-[#fff2f1] px-4 py-3 font-secondary text-sm text-[#8a3131]" data-login-error></p>
 
-			.field input,
-			.field select {
-				height: 34px;
-				width: 100%;
-				border-radius: 6px;
-				border: 1px solid rgb(var(--gray-light));
-				background: #fff;
-				padding: 0 0.7rem;
-				font-size: 0.78rem;
-				color: rgb(var(--gray-dark));
-			}
+              <button
+                class="flex h-12 w-full items-center justify-center bg-[var(--primary)] px-4 font-primary text-[11px] uppercase tracking-[0.22em] text-[var(--primary-foreground)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                type="submit"
+                data-submit-button
+              >
+                Sign in
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
 
-			.field input::placeholder {
-				color: rgb(var(--gray));
-			}
+    <script is:inline define:vars={{ apiBaseUrl }}>
+      const form = document.querySelector("[data-login-form]");
+      const errorBox = document.querySelector("[data-login-error]");
+      const submitButton = document.querySelector("[data-submit-button]");
 
-			.quick-filters {
-				display: flex;
-				gap: 0.45rem;
-				flex-wrap: wrap;
-				margin-bottom: 1.2rem;
-			}
+      form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!(form instanceof HTMLFormElement) || !(submitButton instanceof HTMLButtonElement)) {
+          return;
+        }
 
-			.pill {
-				border: none;
-				background: transparent;
-				padding: 0;
-				font-size: 0.72rem;
-				font-weight: 600;
-				color: rgb(var(--gray-dark));
-				cursor: pointer;
-			}
+        const formData = new FormData(form);
+        const payload = {
+          email: String(formData.get("email") ?? ""),
+          password: String(formData.get("password") ?? ""),
+        };
 
-			.pill.active {
-				color: rgb(var(--black));
-				text-decoration: underline;
-				text-underline-offset: 3px;
-			}
+        if (errorBox instanceof HTMLElement) {
+          errorBox.textContent = "";
+          errorBox.classList.add("hidden");
+        }
 
-			.footer-row {
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				gap: 0.8rem;
-				flex-wrap: wrap;
-			}
+        submitButton.disabled = true;
+        submitButton.textContent = "Signing in...";
 
-			.toggles {
-				display: flex;
-				align-items: center;
-				gap: 2.2rem;
-				flex-wrap: wrap;
-			}
+        try {
+          const response = await fetch(`${apiBaseUrl}/auth/login`, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
 
-			.toggle {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.45rem;
-				font-size: 0.75rem;
-				color: rgb(var(--gray-dark));
-			}
+          if (response.ok) {
+            window.location.assign("/dashboard");
+            return;
+          }
 
-			.toggle input {
-				appearance: none;
-				width: 26px;
-				height: 16px;
-				border-radius: 999px;
-				background: #d8dbe2;
-				position: relative;
-				cursor: pointer;
-				transition: background 140ms ease;
-			}
+          let message = "Sign-in failed. Check your credentials and try again.";
+          try {
+            const body = await response.json();
+            if (body?.error?.message) {
+              message = body.error.message;
+            }
+          } catch {
+            // fall back to the generic message
+          }
 
-			.toggle input::after {
-				content: '';
-				position: absolute;
-				inset: 2px auto auto 2px;
-				width: 12px;
-				height: 12px;
-				border-radius: 50%;
-				background: #fff;
-				transition: transform 140ms ease;
-			}
-
-			.toggle input:checked {
-				background: #16181d;
-			}
-
-			.toggle input:checked::after {
-				transform: translateX(10px);
-			}
-
-			.actions {
-				display: inline-flex;
-				gap: 0.45rem;
-			}
-
-			.actions button {
-				height: 32px;
-				border-radius: 6px;
-				border: 1px solid rgb(var(--gray-light));
-				padding: 0 0.85rem;
-				font-size: 0.72rem;
-				cursor: pointer;
-			}
-
-			.actions .primary {
-				background: #16181d;
-				color: #fff;
-				border-color: #16181d;
-			}
-
-			.actions .secondary {
-				background: #fff;
-				color: rgb(var(--gray-dark));
-			}
-
-			@media (max-width: 900px) {
-				.filter-grid {
-					grid-template-columns: 1fr;
-				}
-
-				.homepage {
-					padding: 1rem;
-					margin-top: 1rem;
-				}
-
-				.toggles {
-					gap: 1rem;
-				}
-			}
-			
-		</style>
-	</head>
-	<body>
-		<Header />
-		<main class="homepage">
-			<section>
-				<div class="heading">
-					<h1>wyszukaj oferty nieruchomości</h1>
-					<p>Ustaw filtry i znajdź mieszkanie, dom lub lokal w wybranej lokalizacji.</p>
-				</div>
-
-				<form>
-					<div class="filter-grid">
-						<div class="field">
-							<label for="offerType">Typ oferty</label>
-							<select id="offerType" name="offerType">
-								<option>Sprzedaż</option>
-								<option>Wynajem</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="propertyType">Rodzaj nieruchomości</label>
-							<select id="propertyType" name="propertyType">
-								<option>Mieszkalny</option>
-								<option>Dom</option>
-								<option>Lokal użytkowy</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="district">Miasto / dzielnica</label>
-							<input id="district" name="district" placeholder="np. Warszawa, Mokotów" />
-						</div>
-
-						<div class="field">
-							<label for="priceMin">Cena od (PLN)</label>
-							<input id="priceMin" name="priceMin" placeholder="np. 550000" />
-						</div>
-						<div class="field">
-							<label for="priceMax">Cena do (PLN)</label>
-							<input id="priceMax" name="priceMax" placeholder="np. 1200000" />
-						</div>
-						<div class="field">
-							<label for="area">Powierzchnia min (m2)</label>
-							<input id="area" name="area" placeholder="np. 45" />
-						</div>
-
-						<div class="field">
-							<label for="rooms">Liczba pokoi</label>
-							<select id="rooms" name="rooms">
-								<option>2+</option>
-								<option>3+</option>
-								<option>4+</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="market">Rynek</label>
-							<select id="market" name="market">
-								<option>Pierwotny i wtórny</option>
-								<option>Pierwotny</option>
-								<option>Wtórny</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="finish">Wykończenie</label>
-							<select id="finish" name="finish">
-								<option>Niewykończone</option>
-								<option>Do zamieszkania</option>
-								<option>Wysoki standard</option>
-							</select>
-						</div>
-
-						<div class="field">
-							<label for="availableFrom">Termin odbioru</label>
-							<select id="availableFrom" name="availableFrom">
-								<option>Dowolny</option>
-								<option>Do 3 miesięcy</option>
-								<option>Do 6 miesięcy</option>
-							</select>
-						</div>
-						<div class="field">
-							<label for="floor">Piętro</label>
-							<input id="floor" name="floor" placeholder="np. 2 - 5" />
-						</div>
-						<div class="field">
-							<label for="year">Rok budowy</label>
-							<input id="year" name="year" placeholder="np. 2010" />
-						</div>
-					</div>
-
-					<div class="quick-filters" aria-label="Szybkie filtry">
-						<button class="pill active" type="button">Balkon</button>
-						<button class="pill" type="button">Winda</button>
-						<button class="pill" type="button">Miejsce postojowe</button>
-						<button class="pill" type="button">Ogród</button>
-						<button class="pill" type="button">Umeblowanie</button>
-					</div>
-
-					<div class="footer-row">
-						<div class="toggles">
-							<label class="toggle" for="promotedOnly">
-								<input id="promotedOnly" type="checkbox" checked />
-								Z promocją
-							</label>
-							<label class="toggle" for="ownerOnly">
-								<input id="ownerOnly" type="checkbox" />
-								Od właściciela
-							</label>
-							<label class="toggle" for="forNow">
-								<input id="forNow" type="checkbox" />
-								Od zaraz
-							</label>
-						</div>
-
-						<div class="actions">
-							<button class="primary" type="submit">Szukaj ofert</button>
-							<button class="secondary" type="reset">Wyczyść</button>
-						</div>
-					</div>
-				</form>
-			</section>
-		</main>
-	</body>
+          if (errorBox instanceof HTMLElement) {
+            errorBox.textContent = message;
+            errorBox.classList.remove("hidden");
+          }
+        } catch {
+          if (errorBox instanceof HTMLElement) {
+            errorBox.textContent = "Authentication service is unavailable right now.";
+            errorBox.classList.remove("hidden");
+          }
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "Sign in";
+        }
+      });
+    </script>
+  </body>
 </html>
