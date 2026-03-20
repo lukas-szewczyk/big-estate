@@ -4,6 +4,11 @@
   "exclude": ["dist"],
   "compilerOptions": {
     "strictNullChecks": true,
-    "types": ["./worker-configuration.d.ts", "node"]
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "types": ["./worker-configuration.d.ts", "node"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   }
 }

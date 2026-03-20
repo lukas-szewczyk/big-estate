@@ -16,6 +16,11 @@
       "sourceType": "github",
       "computedHash": "5655f09026204f4b753c9e06dc6483e9f6ddeec18bb3daa8735195c4b2d1f752"
     },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    },
     "web-perf": {
       "source": "cloudflare/skills",
       "sourceType": "github",

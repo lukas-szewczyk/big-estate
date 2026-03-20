@@ -1,6 +1,6 @@
 ---
 export const prerender = false;
-
+import { Button } from "@/components/ui/button"
 import "../styles/dashboard.css";
 import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
 import BaseHead from "../components/BaseHead.astro";
@@ -64,6 +64,7 @@ const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
             </div>
           </div>
         </div>
+        <Button>fdsafsa</Button>
 
         <div class="flex items-center bg-[rgba(244,244,242,0.75)] p-6 sm:p-8 md:p-10">
           <div class="w-full space-y-6">
