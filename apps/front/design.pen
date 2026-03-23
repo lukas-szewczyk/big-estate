@@ -3888,7 +3888,7 @@
                   "type": "ref",
                   "ref": "C3KOZ",
                   "x": 24,
-                  "y": 24.019943701668048,
+                  "y": 24.01994370166805,
                   "width": "fill_container",
                   "height": "fit_content",
                   "descendants": {
@@ -3966,7 +3966,7 @@
             "L6Ngo": {
               "width": "fill_container",
               "height": "fit_content",
-              "y": 24.019943701668048
+              "y": 24.01994370166805
             },
             "L6Ngo/RO4Ll": {
               "x": 39,
@@ -4046,7 +4046,7 @@
             "L6Ngo": {
               "width": "fill_container",
               "height": "fit_content",
-              "y": 24.019943701668048
+              "y": 24.01994370166805
             },
             "L6Ngo/RO4Ll": {
               "x": 39,
@@ -5076,7 +5076,7 @@
       "id": "dT0Ca",
       "x": 2920,
       "y": 0,
-      "name": "Login Page",
+      "name": "Login Page (/login)",
       "theme": {
         "Accent": "Blue",
         "Base": "Zinc",
@@ -5161,7 +5161,8 @@
                           "lineHeight": 1.45,
                           "textAlign": "center",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5297,7 +5298,8 @@
                                   "fill": "$--muted-foreground",
                                   "content": "or continue with",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 },
                                 {
                                   "type": "frame",
@@ -5319,19 +5321,25 @@
                           "name": "email",
                           "x": 28,
                           "y": 109,
+                          "height": "fit_content",
                           "descendants": {
                             "QRy7x": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content"
                             },
                             "BX0XX": {
                               "content": "Email or phone",
                               "width": "fill_container"
                             },
                             "i0Z3E": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "y": 26
                             },
                             "SDRKn": {
-                              "content": "name@example.com"
+                              "content": "name@example.com",
+                              "x": 12,
+                              "y": 10
                             }
                           }
                         },
@@ -5343,19 +5351,25 @@
                           "name": "password",
                           "x": 28,
                           "y": 191,
+                          "height": "fit_content",
                           "descendants": {
                             "QRy7x": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content"
                             },
                             "BX0XX": {
                               "content": "Password",
                               "width": "fill_container"
                             },
                             "i0Z3E": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "y": 26
                             },
                             "SDRKn": {
-                              "content": "Enter your password"
+                              "content": "Enter your password",
+                              "x": 12,
+                              "y": 10
                             }
                           }
                         },
@@ -5389,7 +5403,8 @@
                           "content": "Not your device? Use a private window to sign in securely.",
                           "lineHeight": 1.4,
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5414,13 +5429,15 @@
                           "width": "fit_content",
                           "x": 28,
                           "y": 8,
+                          "height": "fit_content",
                           "descendants": {
                             "l8v2I": {
                               "enabled": false
                             },
                             "poRwU": {
                               "content": "Create account",
-                              "x": 16
+                              "x": 16,
+                              "y": 8
                             }
                           }
                         },
@@ -5432,13 +5449,15 @@
                           "width": "fit_content",
                           "x": 314,
                           "y": 8,
+                          "height": "fit_content",
                           "descendants": {
                             "8jVfJ": {
                               "enabled": false
                             },
                             "8tnXG": {
                               "content": "Sign in",
-                              "x": 16
+                              "x": 16,
+                              "y": 8
                             }
                           }
                         }
@@ -5461,7 +5480,8 @@
                       "fill": "$--muted-foreground",
                       "content": "English (United States)",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 12,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -5477,7 +5497,8 @@
                           "fill": "$--muted-foreground",
                           "content": "Help",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -5486,7 +5507,8 @@
                           "fill": "$--muted-foreground",
                           "content": "Privacy",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "text",
@@ -5495,7 +5517,8 @@
                           "fill": "$--muted-foreground",
                           "content": "Terms",
                           "fontFamily": "Inter",
-                          "fontSize": 12
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         }
                       ]
                     }
@@ -5512,7 +5535,7 @@
       "id": "m1uNU",
       "x": 4480,
       "y": 0,
-      "name": "Register Page",
+      "name": "Register Page (/register)",
       "theme": {
         "Accent": "Blue",
         "Base": "Zinc",
@@ -5597,7 +5620,8 @@
                           "lineHeight": 1.45,
                           "textAlign": "center",
                           "fontFamily": "Inter",
-                          "fontSize": 14
+                          "fontSize": 14,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -5733,7 +5757,8 @@
                                   "fill": "$--muted-foreground",
                                   "content": "or continue with",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 },
                                 {
                                   "type": "frame",
@@ -5748,83 +5773,32 @@
                           ]
                         },
                         {
-                          "type": "frame",
-                          "id": "g8IM0",
-                          "name": "nameRow",
-                          "width": "fill_container",
-                          "gap": 12,
-                          "children": [
-                            {
-                              "id": "6YeJw",
-                              "type": "ref",
-                              "ref": "1415a",
-                              "width": "fill_container",
-                              "name": "firstName",
-                              "x": 0,
-                              "y": 0,
-                              "descendants": {
-                                "QRy7x": {
-                                  "width": "fill_container"
-                                },
-                                "BX0XX": {
-                                  "content": "First name",
-                                  "width": "fill_container"
-                                },
-                                "i0Z3E": {
-                                  "width": "fill_container"
-                                },
-                                "SDRKn": {
-                                  "content": "Alex"
-                                }
-                              }
-                            },
-                            {
-                              "id": "rto5F",
-                              "type": "ref",
-                              "ref": "1415a",
-                              "width": "fill_container",
-                              "name": "lastName",
-                              "x": 208,
-                              "y": 0,
-                              "descendants": {
-                                "QRy7x": {
-                                  "width": "fill_container"
-                                },
-                                "BX0XX": {
-                                  "content": "Last name",
-                                  "width": "fill_container"
-                                },
-                                "i0Z3E": {
-                                  "width": "fill_container"
-                                },
-                                "SDRKn": {
-                                  "content": "Morgan"
-                                }
-                              }
-                            }
-                          ]
-                        },
-                        {
                           "id": "eh6uj",
                           "type": "ref",
                           "ref": "1415a",
                           "width": "fill_container",
                           "name": "email",
                           "x": 28,
-                          "y": 191,
+                          "y": 109,
+                          "height": "fit_content",
                           "descendants": {
                             "QRy7x": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content"
                             },
                             "BX0XX": {
                               "content": "Email",
                               "width": "fill_container"
                             },
                             "i0Z3E": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "y": 26
                             },
                             "SDRKn": {
-                              "content": "name@example.com"
+                              "content": "name@example.com",
+                              "x": 12,
+                              "y": 10
                             }
                           }
                         },
@@ -5835,20 +5809,26 @@
                           "width": "fill_container",
                           "name": "password",
                           "x": 28,
-                          "y": 273,
+                          "y": 191,
+                          "height": "fit_content",
                           "descendants": {
                             "QRy7x": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content"
                             },
                             "BX0XX": {
                               "content": "Password",
                               "width": "fill_container"
                             },
                             "i0Z3E": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "y": 26
                             },
                             "SDRKn": {
-                              "content": "Create a password"
+                              "content": "Create a password",
+                              "x": 12,
+                              "y": 10
                             }
                           }
                         },
@@ -5859,20 +5839,26 @@
                           "width": "fill_container",
                           "name": "confirm",
                           "x": 28,
-                          "y": 355,
+                          "y": 273,
+                          "height": "fit_content",
                           "descendants": {
                             "QRy7x": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content"
                             },
                             "BX0XX": {
                               "content": "Confirm password",
                               "width": "fill_container"
                             },
                             "i0Z3E": {
-                              "width": "fill_container"
+                              "width": "fill_container",
+                              "height": "fit_content",
+                              "y": 26
                             },
                             "SDRKn": {
-                              "content": "Repeat your password"
+                              "content": "Repeat your password",
+                              "x": 12,
+                              "y": 10
                             }
                           }
                         },
@@ -5883,10 +5869,12 @@
                           "width": "fit_content",
                           "name": "terms",
                           "x": 28,
-                          "y": 437,
+                          "y": 355,
+                          "height": "fit_content",
                           "descendants": {
                             "dszbm": {
-                              "width": "fit_content"
+                              "width": "fit_content",
+                              "height": "fit_content"
                             },
                             "15v9d": {
                               "content": "I agree to the Terms and Privacy Policy"
@@ -5903,13 +5891,14 @@
                           "content": "By continuing, you confirm this account will be used for personal access across your workspace.",
                           "lineHeight": 1.4,
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
                     "bvhSM": {
                       "width": "fill_container",
-                      "y": 662,
+                      "y": 580,
                       "height": "fit_content",
                       "padding": [
                         8,
@@ -5928,13 +5917,15 @@
                           "width": "fit_content",
                           "x": 28,
                           "y": 8,
+                          "height": "fit_content",
                           "descendants": {
                             "l8v2I": {
                               "enabled": false
                             },
                             "poRwU": {
                               "content": "Sign in instead",
-                              "x": 16
+                              "x": 16,
+                              "y": 8
                             }
                           }
                         },
@@ -5946,13 +5937,15 @@
                           "width": "fit_content",
                           "x": 297,
                           "y": 8,
+                          "height": "fit_content",
                           "descendants": {
                             "8jVfJ": {
                               "enabled": false
                             },
                             "8tnXG": {
                               "content": "Create account",
-                              "x": 16
+                              "x": 16,
+                              "y": 8
                             }
                           }
                         }
@@ -5975,7 +5968,8 @@
                       "fill": "$--muted-foreground",
                       "content": "English (United States)",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 12,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "text",
@@ -5984,7 +5978,8 @@
                       "fill": "$--muted-foreground",
                       "content": "Help   Privacy   Terms",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 12,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
