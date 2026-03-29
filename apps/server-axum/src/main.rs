@@ -1,6 +1,6 @@
 use std::io;
 
-use server_axum::{bootstrap, build_app, create_state, Config, MIGRATOR};
+use server_axum::{bootstrap, build_app, create_state, seed_reference_data, Config, MIGRATOR};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Clone, Copy, Debug)]
@@ -8,6 +8,7 @@ enum Command {
     Serve,
     Migrate,
     BootstrapAdmin,
+    SeedReferenceData,
 }
 
 #[tokio::main]
@@ -46,6 +47,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .map_err(io::Error::other)?;
             tracing::info!("bootstrap admin command completed");
         }
+        Command::SeedReferenceData => {
+            MIGRATOR.run(&state.db).await?;
+            seed_reference_data(&state.db)
+                .await
+                .map_err(io::Error::other)?;
+            tracing::info!("reference data seeding completed");
+        }
     }
 
     Ok(())
@@ -56,8 +64,9 @@ fn parse_command() -> Result<Command, io::Error> {
         None | Some("serve") => Ok(Command::Serve),
         Some("migrate") => Ok(Command::Migrate),
         Some("bootstrap-admin") => Ok(Command::BootstrapAdmin),
+        Some("seed-reference-data") => Ok(Command::SeedReferenceData),
         Some(other) => Err(io::Error::other(format!(
-            "unknown command {other}; expected serve, migrate, or bootstrap-admin"
+            "unknown command {other}; expected serve, migrate, bootstrap-admin, or seed-reference-data"
         ))),
     }
 }

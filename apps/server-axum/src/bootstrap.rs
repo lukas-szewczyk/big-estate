@@ -1,6 +1,11 @@
 use sqlx::PgPool;
 
-use crate::{config::Config, error::ApiError, models::UserRole, users};
+use crate::{
+    accounts::{create_user, find_user_by_email},
+    config::Config,
+    error::ApiError,
+    models::{BusinessRole, PlatformRole},
+};
 
 pub async fn ensure_bootstrap_admin(pool: &PgPool, config: &Config) -> Result<(), ApiError> {
     let Some(email) = config.bootstrap_admin_email.as_deref() else {
@@ -13,12 +18,19 @@ pub async fn ensure_bootstrap_admin(pool: &PgPool, config: &Config) -> Result<()
         ));
     };
 
-    if users::find_user_by_email(pool, email).await?.is_some() {
+    if find_user_by_email(pool, email).await?.is_some() {
         tracing::info!(email = %email, "bootstrap admin already exists");
         return Ok(());
     }
 
-    let user = users::create_user(pool, email, password, UserRole::Admin).await?;
+    let user = create_user(
+        pool,
+        email,
+        password,
+        PlatformRole::Admin,
+        BusinessRole::Buyer,
+    )
+    .await?;
     tracing::info!(email = %user.email, "bootstrap admin created");
     Ok(())
 }

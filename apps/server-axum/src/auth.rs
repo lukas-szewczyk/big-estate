@@ -18,10 +18,10 @@ use sqlx::PgPool;
 use time::Duration;
 
 use crate::{
+    accounts::{create_user, find_user_by_email},
     config::normalize_email,
     error::ApiError,
-    models::{PublicUser, UserRole},
-    users::{create_user, find_user_by_email},
+    models::{BusinessRole, PlatformRole, PublicUser},
     AppState,
 };
 
@@ -41,8 +41,10 @@ pub struct RegisterRequest {
 pub struct AuthenticatedUser {
     pub id: i64,
     pub email: String,
-    pub role: UserRole,
-    pub token_hash: String,
+    pub role: PlatformRole,
+    pub business_role: BusinessRole,
+    pub agency_id: Option<i64>,
+    pub is_verified: bool,
 }
 
 impl AuthenticatedUser {
@@ -51,6 +53,9 @@ impl AuthenticatedUser {
             id: self.id,
             email: self.email.clone(),
             role: self.role,
+            business_role: self.business_role,
+            agency_id: self.agency_id,
+            is_verified: self.is_verified,
         }
     }
 }
@@ -76,36 +81,18 @@ pub async fn register_handler(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<Response, ApiError> {
-    let user = create_user(&state.db, &payload.email, &payload.password, UserRole::User).await?;
+    let user = create_user(
+        &state.db,
+        &payload.email,
+        &payload.password,
+        PlatformRole::User,
+        BusinessRole::Buyer,
+    )
+    .await?;
     let cookie = create_session_cookie(&state, user.id).await?;
     let mut response = (StatusCode::CREATED, Json(user.public())).into_response();
     append_cookie(&mut response, &cookie)?;
     Ok(response)
-}
-
-async fn create_session_cookie(
-    state: &AppState,
-    user_id: i64,
-) -> Result<Cookie<'static>, ApiError> {
-    let session_token = generate_session_token();
-    let session_token_hash = hash_session_token(&session_token);
-    let expires_at =
-        time::OffsetDateTime::now_utc() + Duration::days(state.config.session_ttl_days);
-
-    sqlx::query(
-        r#"
-        INSERT INTO sessions (user_id, token_hash, expires_at)
-        VALUES ($1, $2, $3)
-        "#,
-    )
-    .bind(user_id)
-    .bind(&session_token_hash)
-    .bind(expires_at)
-    .execute(&state.db)
-    .await?;
-
-    let cookie = build_session_cookie(state, &session_token);
-    Ok(cookie)
 }
 
 pub async fn logout_handler(
@@ -165,13 +152,6 @@ pub fn hash_password(password: &str) -> Result<String, ApiError> {
         })
 }
 
-fn verify_password(password: &str, password_hash: &str) -> Result<(), ApiError> {
-    let parsed_hash = PasswordHash::new(password_hash).map_err(|_| invalid_credentials())?;
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed_hash)
-        .map_err(|_| invalid_credentials())
-}
-
 pub async fn lookup_authenticated_user(
     pool: &PgPool,
     session_token: &str,
@@ -179,7 +159,7 @@ pub async fn lookup_authenticated_user(
     let token_hash = hash_session_token(session_token);
     let row = sqlx::query(
         r#"
-        SELECT users.id, users.email, users.role
+        SELECT users.id, users.email, users.role, users.business_role, users.agency_id, users.is_verified
         FROM sessions
         INNER JOIN users ON users.id = sessions.user_id
         WHERE sessions.token_hash = $1
@@ -193,13 +173,19 @@ pub async fn lookup_authenticated_user(
 
     let row = row.ok_or_else(unauthorized)?;
     let role: String = sqlx::Row::try_get(&row, "role").map_err(ApiError::from)?;
+    let business_role: String =
+        sqlx::Row::try_get(&row, "business_role").map_err(ApiError::from)?;
 
     Ok(AuthenticatedUser {
         id: sqlx::Row::try_get(&row, "id").map_err(ApiError::from)?,
         email: sqlx::Row::try_get(&row, "email").map_err(ApiError::from)?,
-        role: UserRole::try_from(role)
+        role: PlatformRole::try_from(role)
             .map_err(|_| ApiError::internal("invalid_role", "Stored user role is invalid"))?,
-        token_hash,
+        business_role: BusinessRole::try_from(business_role).map_err(|_| {
+            ApiError::internal("invalid_business_role", "Stored business role is invalid")
+        })?,
+        agency_id: sqlx::Row::try_get(&row, "agency_id").map_err(ApiError::from)?,
+        is_verified: sqlx::Row::try_get(&row, "is_verified").map_err(ApiError::from)?,
     })
 }
 
@@ -220,6 +206,37 @@ pub fn build_session_cookie(state: &AppState, session_token: &str) -> Cookie<'st
     }
 
     cookie
+}
+
+fn verify_password(password: &str, password_hash: &str) -> Result<(), ApiError> {
+    let parsed_hash = PasswordHash::new(password_hash).map_err(|_| invalid_credentials())?;
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .map_err(|_| invalid_credentials())
+}
+
+async fn create_session_cookie(
+    state: &AppState,
+    user_id: i64,
+) -> Result<Cookie<'static>, ApiError> {
+    let session_token = generate_session_token();
+    let session_token_hash = hash_session_token(&session_token);
+    let expires_at =
+        time::OffsetDateTime::now_utc() + Duration::days(state.config.session_ttl_days);
+
+    sqlx::query(
+        r#"
+        INSERT INTO sessions (user_id, token_hash, expires_at)
+        VALUES ($1, $2, $3)
+        "#,
+    )
+    .bind(user_id)
+    .bind(&session_token_hash)
+    .bind(expires_at)
+    .execute(&state.db)
+    .await?;
+
+    Ok(build_session_cookie(state, &session_token))
 }
 
 fn removal_cookie(state: &AppState) -> Cookie<'static> {
@@ -259,15 +276,16 @@ fn read_session_token(headers: &HeaderMap, cookie_name: &str) -> Option<String> 
     })
 }
 
-fn hash_session_token(token: &str) -> String {
-    let digest = Sha256::digest(token.as_bytes());
-    hex::encode(digest)
-}
-
 fn generate_session_token() -> String {
     let mut bytes = [0_u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    OsRng.fill_bytes(&mut bytes);
     Base64UrlUnpadded::encode_string(&bytes)
+}
+
+fn hash_session_token(session_token: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(session_token.as_bytes());
+    hex::encode(hasher.finalize())
 }
 
 fn invalid_credentials() -> ApiError {
