@@ -67,6 +67,19 @@ pub struct ListListingsQuery {
     pub per_page: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ListListingsGeoJsonQuery {
+    pub bbox: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct BoundingBox {
+    min_lng: f64,
+    min_lat: f64,
+    max_lng: f64,
+    max_lat: f64,
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct MediaResponse {
     pub id: i64,
@@ -103,6 +116,42 @@ pub struct ListingResponse {
     pub property: PropertyResponse,
     pub media: Vec<MediaResponse>,
     pub open_houses: Vec<OpenHouseResponse>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListingGeoJsonFeatureCollection {
+    #[serde(rename = "type")]
+    pub type_name: &'static str,
+    pub features: Vec<ListingGeoJsonFeature>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListingGeoJsonFeature {
+    #[serde(rename = "type")]
+    pub type_name: &'static str,
+    pub geometry: ListingGeoJsonGeometry,
+    pub properties: ListingGeoJsonProperties,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListingGeoJsonGeometry {
+    #[serde(rename = "type")]
+    pub type_name: &'static str,
+    pub coordinates: [f64; 2],
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListingGeoJsonProperties {
+    pub id: i64,
+    pub slug: String,
+    pub title: String,
+    pub price: f64,
+    pub rooms: i32,
+    pub transaction_type: String,
+    pub thumbnail_url: String,
+    pub city: String,
+    pub street: String,
 }
 
 pub async fn list_listings_handler(
@@ -211,6 +260,99 @@ pub async fn list_listings_handler(
         pagination,
         total as u64,
     )))
+}
+
+pub async fn list_listings_geojson_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ListListingsGeoJsonQuery>,
+) -> Result<Json<ListingGeoJsonFeatureCollection>, ApiError> {
+    let bbox = parse_bbox(query.bbox.as_deref())?;
+
+    let rows = sqlx::query(
+        r#"
+        SELECT l.id,
+               l.slug,
+               l.transaction_type,
+               l.price::text AS price,
+               p.rooms,
+               c.name AS category_name,
+               city.name AS city_name,
+               loc.street,
+               ST_Y(loc.coordinates::geometry) AS latitude,
+               ST_X(loc.coordinates::geometry) AS longitude,
+               primary_media.url AS thumbnail_url
+        FROM listings l
+        INNER JOIN properties p ON p.id = l.property_id
+        INNER JOIN categories c ON c.id = p.category_id
+        INNER JOIN locations loc ON loc.id = p.location_id
+        INNER JOIN cities city ON city.id = loc.city_id
+        LEFT JOIN LATERAL (
+            SELECT url
+            FROM media
+            WHERE listing_id = l.id AND media_type = 'photo'
+            ORDER BY is_main DESC, sort_order ASC, id ASC
+            LIMIT 1
+        ) AS primary_media ON TRUE
+        WHERE l.status = 'active'
+          AND ST_Intersects(
+                loc.coordinates::geometry,
+                ST_MakeEnvelope($1, $2, $3, $4, 4326)
+          )
+        ORDER BY l.updated_at DESC, l.id DESC
+        "#,
+    )
+    .bind(bbox.min_lng)
+    .bind(bbox.min_lat)
+    .bind(bbox.max_lng)
+    .bind(bbox.max_lat)
+    .fetch_all(&state.db)
+    .await?;
+
+    let features = rows
+        .into_iter()
+        .map(|row| {
+            let transaction_type: String =
+                row.try_get("transaction_type").map_err(ApiError::from)?;
+            let transaction_type = TransactionType::try_from(transaction_type).map_err(|_| {
+                ApiError::internal(
+                    "invalid_transaction_type",
+                    "Stored transaction type is invalid",
+                )
+            })?;
+            let category_name: String = row.try_get("category_name").map_err(ApiError::from)?;
+            let city_name: String = row.try_get("city_name").map_err(ApiError::from)?;
+            let street: String = row.try_get("street").map_err(ApiError::from)?;
+            let latitude: f64 = row.try_get("latitude").map_err(ApiError::from)?;
+            let longitude: f64 = row.try_get("longitude").map_err(ApiError::from)?;
+
+            Ok(ListingGeoJsonFeature {
+                type_name: "Feature",
+                geometry: ListingGeoJsonGeometry {
+                    type_name: "Point",
+                    coordinates: [longitude, latitude],
+                },
+                properties: ListingGeoJsonProperties {
+                    id: row.try_get("id").map_err(ApiError::from)?,
+                    slug: row.try_get("slug").map_err(ApiError::from)?,
+                    title: build_geojson_listing_title(&category_name, &city_name),
+                    price: parse_db_f64(row.try_get("price").map_err(ApiError::from)?, "price")?,
+                    rooms: row.try_get("rooms").map_err(ApiError::from)?,
+                    transaction_type: transaction_type.as_str().to_string(),
+                    thumbnail_url: row
+                        .try_get::<Option<String>, _>("thumbnail_url")
+                        .map_err(ApiError::from)?
+                        .unwrap_or_else(|| "/listing-placeholder.svg".to_string()),
+                    city: city_name,
+                    street,
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+
+    Ok(Json(ListingGeoJsonFeatureCollection {
+        type_name: "FeatureCollection",
+        features,
+    }))
 }
 
 pub async fn create_listing_handler(
@@ -700,6 +842,80 @@ fn parse_optional_listing_status(value: Option<&str>) -> Result<Option<ListingSt
         })
 }
 
+fn parse_bbox(raw: Option<&str>) -> Result<BoundingBox, ApiError> {
+    let raw = raw.ok_or_else(|| {
+        ApiError::bad_request(
+            "invalid_bbox",
+            "bbox must contain four numbers: minLng,minLat,maxLng,maxLat",
+        )
+    })?;
+
+    let values = raw
+        .split(',')
+        .map(|value| {
+            value.trim().parse::<f64>().map_err(|_| {
+                ApiError::bad_request(
+                    "invalid_bbox",
+                    "bbox must contain four numbers: minLng,minLat,maxLng,maxLat",
+                )
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if values.len() != 4 {
+        return Err(ApiError::bad_request(
+            "invalid_bbox",
+            "bbox must contain four numbers: minLng,minLat,maxLng,maxLat",
+        ));
+    }
+
+    let bbox = BoundingBox {
+        min_lng: values[0],
+        min_lat: values[1],
+        max_lng: values[2],
+        max_lat: values[3],
+    };
+
+    ensure_bbox_range("minLng", bbox.min_lng, -180.0, 180.0)?;
+    ensure_bbox_range("maxLng", bbox.max_lng, -180.0, 180.0)?;
+    ensure_bbox_range("minLat", bbox.min_lat, -90.0, 90.0)?;
+    ensure_bbox_range("maxLat", bbox.max_lat, -90.0, 90.0)?;
+
+    if bbox.min_lng >= bbox.max_lng || bbox.min_lat >= bbox.max_lat {
+        return Err(ApiError::bad_request(
+            "invalid_bbox",
+            "bbox must satisfy minLng < maxLng and minLat < maxLat",
+        ));
+    }
+
+    Ok(bbox)
+}
+
+fn ensure_bbox_range(field_name: &str, value: f64, min: f64, max: f64) -> Result<(), ApiError> {
+    if value.is_finite() && value >= min && value <= max {
+        return Ok(());
+    }
+
+    Err(ApiError::bad_request(
+        "invalid_bbox",
+        format!("{field_name} must be between {min} and {max}"),
+    ))
+}
+
+fn build_geojson_listing_title(category_name: &str, city_name: &str) -> String {
+    let mut characters = category_name.chars();
+    let Some(first) = characters.next() else {
+        return format!("Listing in {city_name}");
+    };
+
+    format!(
+        "{}{} in {}",
+        first.to_uppercase(),
+        characters.as_str(),
+        city_name
+    )
+}
+
 fn map_media_row(row: sqlx::postgres::PgRow) -> Result<MediaResponse, ApiError> {
     let media_type: String = row.try_get("media_type").map_err(ApiError::from)?;
     Ok(MediaResponse {
@@ -737,4 +953,31 @@ fn required_text(value: &str, field: &str) -> Result<String, ApiError> {
         ));
     }
     Ok(trimmed.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_bbox, BoundingBox};
+
+    #[test]
+    fn parse_bbox_accepts_valid_envelope() {
+        let bbox = parse_bbox(Some("18.9,52.1,21.2,53.4")).unwrap();
+
+        assert_eq!(
+            bbox,
+            BoundingBox {
+                min_lng: 18.9,
+                min_lat: 52.1,
+                max_lng: 21.2,
+                max_lat: 53.4,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_bbox_rejects_invalid_coordinate_ranges() {
+        assert!(parse_bbox(Some("181,52.1,21.2,53.4")).is_err());
+        assert!(parse_bbox(Some("18.9,-91,21.2,53.4")).is_err());
+        assert!(parse_bbox(Some("18.9,52.1,18.9,53.4")).is_err());
+    }
 }

@@ -1,0 +1,341 @@
+---
+import "maplibre-gl/dist/maplibre-gl.css";
+
+interface Props {
+  class?: string;
+  initialCenter?: [number, number];
+  initialZoom?: number;
+  pmtilesUrl?: string;
+  listingsApiUrl?: string;
+}
+
+const {
+  class: className,
+  initialCenter = [19.1451, 51.9194],
+  initialZoom = 6,
+  pmtilesUrl = "https://pub-bfaa61c41d364f489c3ef9b268baf004.r2.dev/poland.pmtiles",
+  listingsApiUrl = "/api/listings",
+} = Astro.props;
+---
+
+<div
+  class:list={["listing-map", className]}
+  data-listing-map
+  data-initial-center={JSON.stringify(initialCenter)}
+  data-initial-zoom={String(initialZoom)}
+  data-pmtiles-url={pmtilesUrl}
+  data-listings-api-url={listingsApiUrl}
+  data-status="idle"
+>
+  <section class="listing-map__map-pane">
+    <div class="listing-map__canvas" data-listing-map-canvas></div>
+    <div class="listing-map__status" data-listing-map-status hidden></div>
+  </section>
+
+  <aside class="listing-map__list-pane" aria-label="Listings in the current map view">
+    <div class="listing-map__list-header">
+      <p class="listing-map__list-eyebrow">Live search</p>
+      <h2 class="listing-map__list-title">Properties in view</h2>
+      <p class="listing-map__list-summary" data-listing-list-summary>
+        Move the map to load homes in this area.
+      </p>
+    </div>
+
+    <div class="listing-map__list-scroll">
+      <div class="listing-map__empty-state" data-listing-list-empty hidden>
+        No properties in this area
+      </div>
+      <div class="listing-map__cards" data-listing-list-items></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  import { mountListingMap } from "../../scripts/listing-map";
+
+  const mountedMaps = new WeakMap();
+
+  const setupListingMaps = () => {
+    document.querySelectorAll("[data-listing-map]").forEach((node) => {
+      if (!(node instanceof HTMLElement) || mountedMaps.has(node)) {
+        return;
+      }
+
+      const cleanup = mountListingMap(node);
+      mountedMaps.set(node, cleanup);
+    });
+  };
+
+  const cleanupListingMaps = () => {
+    document.querySelectorAll("[data-listing-map]").forEach((node) => {
+      if (!(node instanceof HTMLElement)) {
+        return;
+      }
+
+      const cleanup = mountedMaps.get(node);
+      if (!cleanup) {
+        return;
+      }
+
+      cleanup();
+      mountedMaps.delete(node);
+    });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupListingMaps, {
+      once: true,
+    });
+  } else {
+    setupListingMaps();
+  }
+
+  document.addEventListener("astro:page-load", setupListingMaps);
+  document.addEventListener("astro:after-swap", setupListingMaps);
+  document.addEventListener("astro:before-swap", cleanupListingMaps);
+  window.addEventListener("pagehide", cleanupListingMaps, { once: true });
+</script>
+
+<style>
+  .listing-map {
+    display: grid;
+    grid-template-rows: minmax(22rem, 48vh) minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden;
+    background: #f6f1eb;
+  }
+
+  .listing-map__map-pane {
+    position: relative;
+    min-height: 22rem;
+  }
+
+  .listing-map__canvas {
+    position: absolute;
+    inset: 0;
+  }
+
+  .listing-map__list-pane {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    border-top: 1px solid rgb(48 35 38 / 0.08);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(250 245 240 / 0.97)),
+      linear-gradient(180deg, #f7f0e7 0%, #f0e4d8 100%);
+  }
+
+  .listing-map__list-header {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1.25rem 1.25rem 0.9rem;
+    border-bottom: 1px solid rgb(48 35 38 / 0.08);
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(10px);
+  }
+
+  .listing-map__list-eyebrow {
+    margin: 0;
+    color: #8b5b63;
+    font: 600 0.7rem/1 "JetBrains Mono", monospace;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .listing-map__list-title {
+    margin: 0;
+    color: #22191b;
+    font: 600 1.2rem/1.15 "Geist Variable", sans-serif;
+  }
+
+  .listing-map__list-summary {
+    margin: 0;
+    color: #66595c;
+    font: 0.92rem/1.45 "Geist Variable", sans-serif;
+  }
+
+  .listing-map__list-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem 1rem 1.25rem;
+  }
+
+  .listing-map__cards {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .listing-map__empty-state {
+    border: 1px dashed rgb(139 91 99 / 0.28);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255 / 0.85);
+    color: #6b565a;
+    font: 500 0.95rem/1.5 "Geist Variable", sans-serif;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .listing-map__status {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 2;
+    max-width: min(22rem, calc(100% - 2rem));
+    border: 1px solid rgb(138 69 79 / 0.18);
+    border-radius: 999px;
+    background: rgb(255 250 250 / 0.96);
+    color: #6d3742;
+    font: 500 0.8rem/1.1 "Geist Variable", sans-serif;
+    letter-spacing: 0.01em;
+    padding: 0.7rem 0.95rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 14px 30px rgb(88 53 58 / 0.14);
+  }
+
+  .listing-map :global(.listing-map__card) {
+    display: grid;
+    gap: 0.65rem;
+    width: 100%;
+    border: 1px solid rgb(48 35 38 / 0.09);
+    border-radius: 1.2rem;
+    background: rgb(255 255 255 / 0.92);
+    padding: 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+    box-shadow: 0 12px 32px rgb(60 43 46 / 0.08);
+  }
+
+  .listing-map :global(.listing-map__card:hover) {
+    transform: translateY(-1px);
+    border-color: rgb(139 91 99 / 0.32);
+    box-shadow: 0 20px 38px rgb(60 43 46 / 0.12);
+  }
+
+  .listing-map :global(.listing-map__card:focus-visible) {
+    outline: 3px solid rgb(139 91 99 / 0.28);
+    outline-offset: 2px;
+  }
+
+  .listing-map :global(.listing-map__card.is-active) {
+    border-color: rgb(197 76 98 / 0.55);
+    background: linear-gradient(180deg, #fff6f7 0%, #ffffff 100%);
+    box-shadow: 0 22px 40px rgb(92 44 56 / 0.16);
+  }
+
+  .listing-map :global(.listing-map__card-eyebrow) {
+    color: #8b5b63;
+    font: 600 0.68rem/1 "JetBrains Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .listing-map :global(.listing-map__card-title) {
+    margin: 0;
+    color: #251d1f;
+    font: 600 1rem/1.25 "Geist Variable", sans-serif;
+  }
+
+  .listing-map :global(.listing-map__card-meta) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    color: #3b2f32;
+    font: 600 0.95rem/1.2 "Geist Variable", sans-serif;
+  }
+
+  .listing-map :global(.listing-map__card-location) {
+    color: #6a5d60;
+    font: 0.86rem/1.45 "Geist Variable", sans-serif;
+  }
+
+  .listing-map :global(.maplibregl-popup-content) {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 1rem;
+    box-shadow: 0 24px 48px rgb(33 25 26 / 0.18);
+  }
+
+  .listing-map :global(.maplibregl-popup-tip) {
+    border-top-color: white;
+  }
+
+  .listing-map :global(.maplibregl-ctrl-group) {
+    border: 1px solid rgb(128 112 115 / 0.14);
+    box-shadow: 0 12px 28px rgb(50 39 41 / 0.12);
+  }
+
+  .listing-map :global(.listing-popup) {
+    width: min(18rem, 78vw);
+    background: white;
+  }
+
+  .listing-map :global(.listing-popup__image) {
+    display: block;
+    width: 100%;
+    height: 8.5rem;
+    object-fit: cover;
+    background: #f4eeea;
+  }
+
+  .listing-map :global(.listing-popup__body) {
+    display: grid;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .listing-map :global(.listing-popup__eyebrow) {
+    color: #8b5b63;
+    font: 600 0.72rem/1 "JetBrains Mono", monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .listing-map :global(.listing-popup__title) {
+    margin: 0;
+    color: #251d1f;
+    font: 600 1rem/1.2 "Geist Variable", sans-serif;
+  }
+
+  .listing-map :global(.listing-popup__meta) {
+    margin: 0;
+    color: #67585b;
+    font: 0.88rem/1.45 "Geist Variable", sans-serif;
+  }
+
+  .listing-map :global(.listing-popup__details) {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: #2f2527;
+    font: 500 0.88rem/1.2 "Geist Variable", sans-serif;
+  }
+
+  @media (min-width: 960px) {
+    .listing-map {
+      grid-template-columns: minmax(0, 3fr) minmax(21rem, 2fr);
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .listing-map__list-pane {
+      border-top: 0;
+      border-left: 1px solid rgb(48 35 38 / 0.08);
+    }
+
+    .listing-map__list-header {
+      padding: 1.35rem 1.35rem 1rem;
+    }
+
+    .listing-map__list-scroll {
+      padding: 1rem 1.1rem 1.35rem;
+    }
+  }
+</style>

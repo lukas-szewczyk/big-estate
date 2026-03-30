@@ -86,6 +86,10 @@ pub fn build_app(state: AppState) -> Result<Router, ApiError> {
             get(listings::list_listings_handler).post(listings::create_listing_handler),
         )
         .route(
+            "/listings/geojson",
+            get(listings::list_listings_geojson_handler),
+        )
+        .route(
             "/listings/:id",
             get(listings::get_listing_handler).patch(listings::update_listing_handler),
         )

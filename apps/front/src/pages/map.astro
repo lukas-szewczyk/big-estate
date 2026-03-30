@@ -1,0 +1,43 @@
+---
+export const prerender = false;
+
+import BaseHead from "../components/BaseHead.astro";
+import ListingMap from "../components/map/ListingMap.astro";
+---
+
+<!doctype html>
+<html lang="en" class="h-full bg-background">
+  <head>
+    <BaseHead
+      title="Property Search Map"
+      description="Interactive listing map for viewport-based real estate search across Poland."
+      image="/listing-placeholder.svg"
+    />
+  </head>
+  <body class="h-full bg-background text-foreground">
+    <main class="flex min-h-screen flex-col bg-[linear-gradient(180deg,#faf6f0_0%,#f5ede5_100%)]">
+      <header class="border-b border-black/5 bg-white/65 px-5 py-4 backdrop-blur md:px-8">
+        <div class="mx-auto flex max-w-7xl flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div class="space-y-1">
+            <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[#8b5b63]">
+              Real Estate Map MVP
+            </p>
+            <h1 class="font-secondary text-2xl font-semibold text-[#20181a] md:text-[2rem]">
+              Explore active listings across Poland
+            </h1>
+            <p class="max-w-2xl font-secondary text-sm leading-6 text-[#64575a]">
+              Pan the map to refresh listings for the current viewport, cluster dense
+              markets, and open listing previews directly from the map.
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <section class="flex-1 p-4 md:p-6">
+        <div class="mx-auto h-[calc(100vh-9.5rem)] max-w-7xl overflow-hidden rounded-[1.75rem] border border-black/8 bg-white shadow-[0_24px_80px_rgba(45,31,34,0.12)]">
+          <ListingMap class="min-h-full" />
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

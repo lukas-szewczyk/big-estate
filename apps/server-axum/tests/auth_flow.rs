@@ -3,9 +3,9 @@ use serial_test::serial;
 use server_axum::{
     accounts, build_app, create_state,
     models::{BusinessRole, PlatformRole},
-    seed_reference_data, Config, MIGRATOR,
+    seed_reference_data, AppState, Config, MIGRATOR,
 };
-use sqlx::{PgPool, Row};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 use tower::ServiceExt;
 
 fn test_config() -> Config {
@@ -391,6 +391,138 @@ async fn public_listing_search_supports_city_and_radius_filters() {
     let payload: serde_json::Value = json_body(response).await;
     assert_eq!(payload["total"], 1);
     assert_eq!(payload["items"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+#[serial]
+async fn geojson_listing_search_returns_point_features_for_bbox() {
+    let pool = test_pool().await;
+    let (owner_id, owner_cookie) = create_user_with_cookie(
+        &pool,
+        "geojson-owner@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+
+    let property_response = authed_json(
+        http::Method::POST,
+        "/api/v1/properties",
+        &owner_cookie,
+        serde_json::json!({
+            "location": {
+                "city_id": 101,
+                "district_id": 1002,
+                "street": "Pulawska",
+                "postal_code": "00-732",
+                "building_number": "44",
+                "apartment_number": "8",
+                "latitude": 52.2104,
+                "longitude": 21.0047
+            },
+            "category_id": 1,
+            "area_sqm": 61.2,
+            "plot_area_sqm": null,
+            "rooms": 3,
+            "floor": 5,
+            "year_built": 2019,
+            "heating_type": "district",
+            "extra_attributes": { "parking": true },
+            "amenity_ids": [1, 2],
+            "owners": [{ "user_id": owner_id, "ownership_share": 100.0 }]
+        }),
+    )
+    .await;
+    assert_eq!(property_response.status(), http::StatusCode::CREATED);
+    let property_json: serde_json::Value = json_body(property_response).await;
+    let property_id = property_json["id"].as_i64().unwrap();
+
+    let listing_response = authed_json(
+        http::Method::POST,
+        "/api/v1/listings",
+        &owner_cookie,
+        serde_json::json!({
+            "property_id": property_id,
+            "transaction_type": "sale",
+            "price": 845000.0
+        }),
+    )
+    .await;
+    assert_eq!(listing_response.status(), http::StatusCode::CREATED);
+    let listing_json: serde_json::Value = json_body(listing_response).await;
+    let listing_id = listing_json["id"].as_i64().unwrap();
+
+    let add_media = authed_json(
+        http::Method::POST,
+        &format!("/api/v1/listings/{listing_id}/media"),
+        &owner_cookie,
+        serde_json::json!({
+            "media_type": "photo",
+            "url": "https://example.com/listing-main.jpg",
+            "is_main": true,
+            "sort_order": 0
+        }),
+    )
+    .await;
+    assert_eq!(add_media.status(), http::StatusCode::CREATED);
+
+    let response = test_app()
+        .await
+        .oneshot(
+            http::Request::builder()
+                .method(http::Method::GET)
+                .uri("/api/v1/listings/geojson?bbox=20.9500,52.1500,21.0500,52.2600")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), http::StatusCode::OK);
+    let payload: serde_json::Value = json_body(response).await;
+    assert_eq!(payload["type"], "FeatureCollection");
+    assert_eq!(payload["features"].as_array().unwrap().len(), 1);
+
+    let feature = &payload["features"][0];
+    assert_eq!(feature["type"], "Feature");
+    assert_eq!(feature["geometry"]["type"], "Point");
+    assert_eq!(feature["geometry"]["coordinates"][0], 21.0047);
+    assert_eq!(feature["geometry"]["coordinates"][1], 52.2104);
+    assert_eq!(feature["properties"]["id"], listing_id);
+    assert_eq!(feature["properties"]["transactionType"], "sale");
+    assert_eq!(
+        feature["properties"]["thumbnailUrl"],
+        "https://example.com/listing-main.jpg"
+    );
+    assert_eq!(feature["properties"]["title"], "Apartment in Warszawa");
+}
+
+#[tokio::test]
+#[serial]
+async fn geojson_listing_search_rejects_invalid_bbox() {
+    let app = build_app(AppState {
+        db: PgPoolOptions::new()
+            .connect_lazy(&test_config().database_url)
+            .unwrap(),
+        config: test_config(),
+    })
+    .unwrap();
+
+    let response = app
+        .oneshot(
+            http::Request::builder()
+                .method(http::Method::GET)
+                .uri("/api/v1/listings/geojson?bbox=190,52.1,21.2,53.4")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+    let payload: serde_json::Value = json_body(response).await;
+    assert_eq!(payload["error"]["code"], "invalid_bbox");
 }
 
 #[tokio::test]
