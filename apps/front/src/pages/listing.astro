@@ -3,41 +3,553 @@ export const prerender = false;
 
 import BaseHead from "../components/BaseHead.astro";
 import ListingMap from "../components/map/ListingMap.astro";
+
+function sanitizeTransactionType(raw: string | null): "sale" | "rent" {
+  return raw === "rent" ? "rent" : "sale";
+}
+
+type PropertyType = "" | "apartment" | "house" | "plot" | "room";
+
+function sanitizePropertyType(raw: string | null): PropertyType {
+  if (
+    raw === "apartment" ||
+    raw === "house" ||
+    raw === "plot" ||
+    raw === "room"
+  ) {
+    return raw;
+  }
+
+  return "";
+}
+
+function propertyTypeFromCategoryId(raw: string | null): PropertyType {
+  if (raw === "1") {
+    return "apartment";
+  }
+
+  if (raw === "2") {
+    return "house";
+  }
+
+  if (raw === "3") {
+    return "plot";
+  }
+
+  return "";
+}
+
+function categoryIdForPropertyType(propertyType: PropertyType): string {
+  if (propertyType === "apartment") {
+    return "1";
+  }
+
+  if (propertyType === "house") {
+    return "2";
+  }
+
+  if (propertyType === "plot") {
+    return "3";
+  }
+
+  return "";
+}
+
+function sanitizeNumericValue(raw: string | null): string {
+  return raw?.replace(/\D+/g, "") ?? "";
+}
+
+function formatDisplayPrice(raw: string | null): string {
+  const digits = sanitizeNumericValue(raw);
+
+  if (!digits) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("pl-PL").format(Number(digits));
+}
+
+const searchParams = Astro.url.searchParams;
+const transactionType = sanitizeTransactionType(
+  searchParams.get("transaction_type"),
+);
+const propertyType =
+  sanitizePropertyType(searchParams.get("property_type")) ||
+  propertyTypeFromCategoryId(searchParams.get("category_id"));
+const categoryId = categoryIdForPropertyType(propertyType);
+const location = searchParams.get("location") ?? "";
+const minPrice = formatDisplayPrice(searchParams.get("min_price"));
+const maxPrice = formatDisplayPrice(searchParams.get("max_price"));
+const rooms = searchParams.get("rooms") ?? "";
+const pricePlaceholders =
+  transactionType === "rent"
+    ? { min: "np. 2 000", max: "np. 6 500" }
+    : { min: "np. 450 000", max: "np. 1 250 000" };
 ---
 
 <!doctype html>
-<html lang="en" class="h-full bg-background">
+<html lang="pl" class="h-full bg-background">
   <head>
     <BaseHead
-      title="Property Search Map"
-      description="Interactive listing map for viewport-based real estate search across Poland."
+      title="Mapa ofert nieruchomości"
+      description="Przeglądaj aktywne oferty nieruchomości na mapie i porównuj je z listą wyników."
       image="/listing-placeholder.svg"
     />
   </head>
-  <body class="h-full bg-background text-foreground">
-    <main class="flex min-h-screen flex-col bg-[linear-gradient(180deg,#faf6f0_0%,#f5ede5_100%)]">
-      <header class="border-b border-black/5 bg-white/65 px-5 py-4 backdrop-blur md:px-8">
-        <div class="mx-auto flex max-w-7xl flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div class="space-y-1">
-            <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[#8b5b63]">
-              Real Estate Map MVP
-            </p>
-            <h1 class="font-secondary text-2xl font-semibold text-[#20181a] md:text-[2rem]">
-              Explore active listings across Poland
-            </h1>
-            <p class="max-w-2xl font-secondary text-sm leading-6 text-[#64575a]">
-              Pan the map to refresh listings for the current viewport, cluster dense
-              markets, and open listing previews directly from the map.
-            </p>
-          </div>
+  <body class="min-h-full bg-[#f7f3ed] text-[#171512]">
+    <main class="relative flex h-screen min-h-screen flex-col overflow-hidden">
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          class="absolute inset-0"
+          style="background: radial-gradient(circle at top, rgba(178, 146, 101, 0.17) 0%, rgba(248, 244, 238, 0) 34%), linear-gradient(180deg, #f8f4ee 0%, #f3eee5 100%);"
+        ></div>
+        <div
+          class="absolute inset-0 opacity-30"
+          style="background-image: linear-gradient(rgba(18, 17, 14, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(18, 17, 14, 0.05) 1px, transparent 1px); background-size: clamp(3rem, 7vw, 5.25rem) clamp(3rem, 7vw, 5.25rem); mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.48), transparent 82%);"
+        ></div>
+        <div class="absolute top-[-8rem] right-[-6rem] h-72 w-72 rounded-full bg-[#d8c3a8]/25 blur-3xl"></div>
+        <div class="absolute bottom-[-10rem] left-[-6rem] h-80 w-80 rounded-full bg-[#e7dccb]/60 blur-3xl"></div>
+      </div>
+
+      <header class="listing-toolbar-shell sticky top-0 z-20 px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
+        <h1 class="sr-only">Mapa ofert nieruchomości</h1>
+
+        <div class="overflow-x-auto pb-1">
+          <form
+            action="/listing"
+            method="GET"
+            class="listing-toolbar mx-auto grid min-w-[78rem] w-full overflow-hidden rounded-[1.75rem] border border-black/10 bg-white/76 shadow-[0_18px_48px_rgba(40,31,20,0.08)] backdrop-blur-xl"
+            data-search-module
+          >
+            <input
+              type="hidden"
+              name="transaction_type"
+              value={transactionType}
+              data-transaction-input
+            />
+            <input
+              type="hidden"
+              name="category_id"
+              value={categoryId}
+              disabled={categoryId === ""}
+              data-category-input
+            />
+
+            <button
+              type="button"
+              class="listing-transaction-toggle group flex min-h-[5.4rem] cursor-pointer items-center gap-3 px-5 text-left"
+              data-transaction-toggle
+              data-value="sale"
+              data-active={transactionType === "sale" ? "true" : "false"}
+              aria-pressed={transactionType === "sale" ? "true" : "false"}
+            >
+              <svg
+                aria-hidden="true"
+                class="h-6 w-6 shrink-0 text-current"
+                viewBox="0 0 48 48"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              >
+                <path d="M8.5 22.5 24 10l15.5 12.5"></path>
+                <path d="M14 19v18.5h20V19"></path>
+                <path d="M21 37.5V25h6v12.5"></path>
+                <path d="M33.5 12.5v7"></path>
+                <path d="M30 16h7"></path>
+              </svg>
+              <span class="font-secondary text-[1rem] font-semibold tracking-[-0.02em]">
+                Kup
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="listing-transaction-toggle group flex min-h-[5.4rem] cursor-pointer items-center gap-3 border-l border-black/8 px-5 text-left"
+              data-transaction-toggle
+              data-value="rent"
+              data-active={transactionType === "rent" ? "true" : "false"}
+              aria-pressed={transactionType === "rent" ? "true" : "false"}
+            >
+              <svg
+                aria-hidden="true"
+                class="h-6 w-6 shrink-0 text-current"
+                viewBox="0 0 48 48"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              >
+                <path d="M13.5 18.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z"></path>
+                <path d="M19.5 18.5h12.5"></path>
+                <path d="M30.5 18.5v7l6 5.5"></path>
+                <path d="M13.5 18.5v22"></path>
+                <path d="M13.5 33.5h8.5"></path>
+                <path d="M22 33.5c4.7 0 8.5-3.8 8.5-8.5"></path>
+              </svg>
+              <span class="font-secondary text-[1rem] font-semibold tracking-[-0.02em]">
+                Wynajmij
+              </span>
+            </button>
+
+            <label class="listing-toolbar-field border-l border-black/8 px-5" for="listing-location">
+              <span class="listing-toolbar-label">Lokalizacja</span>
+              <input
+                id="listing-location"
+                name="location"
+                type="text"
+                value={location}
+                enterkeyhint="search"
+                autocomplete="off"
+                placeholder="Miasto, dzielnica, okolica"
+                class="listing-toolbar-input"
+              />
+            </label>
+
+            <label class="listing-toolbar-field border-l border-black/8 px-4" for="listing-property-type">
+              <span class="listing-toolbar-label">Typ</span>
+              <select
+                id="listing-property-type"
+                name="property_type"
+                class="listing-toolbar-select"
+                data-property-type-select
+              >
+                <option value="" selected={propertyType === ""}>Dowolny</option>
+                <option value="apartment" selected={propertyType === "apartment"}>Mieszkania</option>
+                <option value="house" selected={propertyType === "house"}>Domy</option>
+                <option value="plot" selected={propertyType === "plot"}>Działki</option>
+                <option value="room" selected={propertyType === "room"}>Pokoje</option>
+              </select>
+            </label>
+
+            <label class="listing-toolbar-field border-l border-black/8 px-4" for="listing-min-price">
+              <span class="listing-toolbar-label">Cena od</span>
+              <input
+                id="listing-min-price"
+                name="min_price"
+                type="text"
+                value={minPrice}
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder={pricePlaceholders.min}
+                class="listing-toolbar-input"
+                data-price-input
+                data-price-kind="min"
+              />
+            </label>
+
+            <label class="listing-toolbar-field border-l border-black/8 px-4" for="listing-max-price">
+              <span class="listing-toolbar-label">Cena do</span>
+              <input
+                id="listing-max-price"
+                name="max_price"
+                type="text"
+                value={maxPrice}
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder={pricePlaceholders.max}
+                class="listing-toolbar-input"
+                data-price-input
+                data-price-kind="max"
+              />
+            </label>
+
+            <label class="listing-toolbar-field border-l border-black/8 px-4" for="listing-rooms">
+              <span class="listing-toolbar-label">Pokoje</span>
+              <select
+                id="listing-rooms"
+                name="rooms"
+                class="listing-toolbar-select"
+              >
+                <option value="" selected={rooms === ""}>Dowolnie</option>
+                <option value="1" selected={rooms === "1"}>1 pokój</option>
+                <option value="2" selected={rooms === "2"}>2 pokoje</option>
+                <option value="3" selected={rooms === "3"}>3 pokoje</option>
+                <option value="4" selected={rooms === "4"}>4+ pokoje</option>
+              </select>
+            </label>
+
+            <button
+              type="submit"
+              class="listing-toolbar-submit group/search flex h-full w-full cursor-pointer items-center justify-center gap-2 bg-[#19150f] px-5 font-secondary text-[1rem] font-medium text-white transition-colors duration-200 hover:bg-[#110e09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#19150f]"
+            >
+              <span>Szukaj</span>
+              <svg
+                aria-hidden="true"
+                class="h-4 w-4 transition-transform duration-300 group-hover/search:translate-x-0.5"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.7"
+              >
+                <path d="M4 10h12"></path>
+                <path d="m10.5 4.5 5.5 5.5-5.5 5.5"></path>
+              </svg>
+            </button>
+          </form>
         </div>
       </header>
 
-      <section class="flex-1 p-4 md:p-6">
-        <div class="mx-auto h-[calc(100vh-9.5rem)] max-w-7xl overflow-hidden rounded-[1.75rem] border border-black/8 bg-white shadow-[0_24px_80px_rgba(45,31,34,0.12)]">
-          <ListingMap class="min-h-full" />
+      <section class="relative z-10 flex-1 min-h-0">
+        <div class="h-full min-h-0 w-full overflow-hidden border-t border-black/8 bg-white/40 backdrop-blur-sm">
+          <ListingMap class="h-full min-h-full" />
         </div>
       </section>
     </main>
+
+    <script is:inline>
+      const moduleRoot = document.querySelector("[data-search-module]");
+
+      if (moduleRoot instanceof HTMLFormElement) {
+        const transactionInput = moduleRoot.querySelector("[data-transaction-input]");
+        const categoryInput = moduleRoot.querySelector("[data-category-input]");
+        const propertyTypeSelect = moduleRoot.querySelector(
+          "[data-property-type-select]",
+        );
+        const toggles = Array.from(
+          moduleRoot.querySelectorAll("[data-transaction-toggle]"),
+        );
+        const priceInputs = Array.from(
+          moduleRoot.querySelectorAll("[data-price-input]"),
+        );
+        const placeholderPresets = {
+          sale: {
+            min: "np. 450 000",
+            max: "np. 1 250 000",
+          },
+          rent: {
+            min: "np. 2 000",
+            max: "np. 6 500",
+          },
+        };
+        const categoryMap = {
+          apartment: "1",
+          house: "2",
+          plot: "3",
+          room: "",
+          "": "",
+        };
+
+        const formatPriceValue = (value) => {
+          const digits = value.replace(/\D+/g, "");
+
+          if (!digits) {
+            return "";
+          }
+
+          return new Intl.NumberFormat("pl-PL").format(Number(digits));
+        };
+
+        const sanitizePriceValue = (value) => value.replace(/\D+/g, "");
+
+        const setTransaction = (value) => {
+          if (!(transactionInput instanceof HTMLInputElement)) {
+            return;
+          }
+
+          transactionInput.value = value;
+
+          toggles.forEach((toggle) => {
+            if (!(toggle instanceof HTMLButtonElement)) {
+              return;
+            }
+
+            const isActive = toggle.dataset.value === value;
+            toggle.dataset.active = isActive ? "true" : "false";
+            toggle.setAttribute("aria-pressed", String(isActive));
+          });
+
+          priceInputs.forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+              return;
+            }
+
+            const kind = input.dataset.priceKind;
+            if (kind !== "min" && kind !== "max") {
+              return;
+            }
+
+            input.placeholder = placeholderPresets[value]?.[kind] ?? input.placeholder;
+          });
+        };
+
+        const syncCategoryInput = () => {
+          if (
+            !(categoryInput instanceof HTMLInputElement) ||
+            !(propertyTypeSelect instanceof HTMLSelectElement)
+          ) {
+            return;
+          }
+
+          const categoryId = categoryMap[propertyTypeSelect.value] ?? "";
+          categoryInput.value = categoryId;
+          categoryInput.disabled = categoryId === "";
+        };
+
+        toggles.forEach((toggle) => {
+          if (!(toggle instanceof HTMLButtonElement)) {
+            return;
+          }
+
+          toggle.addEventListener("click", () => {
+            const value = toggle.dataset.value;
+            if (!value) {
+              return;
+            }
+
+            setTransaction(value);
+          });
+        });
+
+        if (propertyTypeSelect instanceof HTMLSelectElement) {
+          propertyTypeSelect.addEventListener("change", syncCategoryInput);
+          syncCategoryInput();
+        }
+
+        priceInputs.forEach((input) => {
+          if (!(input instanceof HTMLInputElement)) {
+            return;
+          }
+
+          input.addEventListener("input", () => {
+            input.value = formatPriceValue(input.value);
+          });
+
+          input.addEventListener("blur", () => {
+            input.value = formatPriceValue(input.value);
+          });
+        });
+
+        moduleRoot.addEventListener("submit", () => {
+          priceInputs.forEach((input) => {
+            if (input instanceof HTMLInputElement) {
+              input.value = sanitizePriceValue(input.value);
+            }
+          });
+        });
+      }
+    </script>
+
+    <style>
+      .listing-toolbar-shell {
+        background: linear-gradient(180deg, rgb(248 244 238 / 0.92), rgb(248 244 238 / 0.72));
+        backdrop-filter: blur(12px);
+      }
+
+      .listing-toolbar {
+        grid-template-columns:
+          minmax(0, 9rem)
+          minmax(0, 10rem)
+          minmax(15rem, 1fr)
+          minmax(0, 10rem)
+          minmax(0, 10rem)
+          minmax(0, 10rem)
+          minmax(0, 8.5rem)
+          minmax(0, 10.5rem);
+        animation: fade-up 620ms cubic-bezier(0.2, 1, 0.22, 1) both;
+      }
+
+      .listing-transaction-toggle {
+        color: #2d271f;
+        background: transparent;
+        transition:
+          background-color 200ms ease,
+          color 200ms ease,
+          transform 200ms ease;
+      }
+
+      .listing-transaction-toggle:hover {
+        background: rgba(245, 239, 232, 0.72);
+      }
+
+      .listing-transaction-toggle[data-active="true"] {
+        color: #17130f;
+        background:
+          radial-gradient(circle at top right, rgba(199, 170, 129, 0.26), transparent 60%),
+          linear-gradient(180deg, rgba(247, 241, 232, 0.98) 0%, rgba(255, 255, 255, 0.88) 100%);
+      }
+
+      .listing-transaction-toggle:focus-visible {
+        outline: 2px solid rgba(25, 21, 15, 0.38);
+        outline-offset: -2px;
+      }
+
+      .listing-toolbar-field {
+        display: flex;
+        min-height: 5.4rem;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.45rem;
+      }
+
+      .listing-toolbar-label {
+        font:
+          600 0.62rem/1 "JetBrains Mono",
+          monospace;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: #8a7760;
+      }
+
+      .listing-toolbar-input,
+      .listing-toolbar-select {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #17130f;
+        font:
+          500 1rem/1.2 "Geist Variable",
+          sans-serif;
+        letter-spacing: -0.02em;
+        outline: none;
+        appearance: none;
+      }
+
+      .listing-toolbar-input::placeholder {
+        color: #9a8f81;
+      }
+
+      .listing-toolbar-select {
+        cursor: pointer;
+      }
+
+      .listing-toolbar-select option {
+        color: #17130f;
+      }
+
+      .listing-toolbar-input::-webkit-outer-spin-button,
+      .listing-toolbar-input::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+
+      @keyframes fade-up {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .listing-toolbar,
+        .listing-transaction-toggle,
+        .group\/search svg {
+          animation: none;
+          transition: none;
+        }
+      }
+    </style>
   </body>
 </html>

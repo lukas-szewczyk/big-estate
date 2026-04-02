@@ -5,15 +5,487 @@ import BaseHead from "../components/BaseHead.astro";
 ---
 
 <!doctype html>
-<html lang="en" class="h-full bg-background">
+<html lang="pl" class="h-full bg-background">
   <head>
     <BaseHead
-      title="Find Homes Across Poland"
-      description="Explore active real estate listings with a synchronized map and property list."
+      title="Znajdź oferty nieruchomości szybciej"
+      description="Skup się na tym, co najważniejsze: wybierz typ transakcji, lokalizację i budżet, a potem przejdź prosto do ofert."
       image="/listing-placeholder.svg"
     />
   </head>
-  <body class="h-full bg-background text-foreground">
+  <body class="min-h-full bg-[#f7f3ed] text-[#171512]">
+    <main class="relative flex min-h-screen flex-col overflow-hidden">
+      <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          class="absolute inset-0"
+          style="background: radial-gradient(circle at top, rgba(178, 146, 101, 0.17) 0%, rgba(248, 244, 238, 0) 34%), linear-gradient(180deg, #f8f4ee 0%, #f3eee5 100%);"
+        ></div>
+        <div
+          class="absolute inset-0 opacity-30"
+          style="background-image: linear-gradient(rgba(18, 17, 14, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(18, 17, 14, 0.05) 1px, transparent 1px); background-size: clamp(3rem, 7vw, 5.25rem) clamp(3rem, 7vw, 5.25rem); mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.48), transparent 82%);"
+        ></div>
+        <div class="absolute top-[-8rem] right-[-6rem] h-72 w-72 rounded-full bg-[#d8c3a8]/25 blur-3xl"></div>
+        <div class="absolute bottom-[-10rem] left-[-6rem] h-80 w-80 rounded-full bg-[#e7dccb]/60 blur-3xl"></div>
+      </div>
 
+      <header class="relative z-10 px-5 pt-4 sm:px-8 sm:pt-7">
+        <div class="mx-auto flex w-full max-w-[72rem] items-center justify-end gap-4">
+          <a
+            href="/login"
+            class="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-[#19150f] px-4 whitespace-nowrap font-secondary text-sm font-medium text-white shadow-[0_10px_24px_rgba(35,28,19,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#110e09]"
+          >
+            Dodaj ogłoszenie
+          </a>
+
+          <a
+            href="/login"
+            class="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white/65 px-4 whitespace-nowrap font-secondary text-sm font-medium text-[#2c261f] shadow-[0_10px_24px_rgba(35,28,19,0.05)] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+          >
+            Moje konto
+          </a>
+        </div>
+      </header>
+
+      <section class="relative z-10 flex flex-1 items-center px-5 pb-6 pt-5 sm:px-8 sm:pb-10 sm:pt-10">
+        <div class="mx-auto flex w-full max-w-[72rem] flex-col items-center">
+
+          <form
+            action="/listing"
+            method="GET"
+            class="search-module w-full "
+            data-search-module
+          >
+            <input type="hidden" name="transaction_type" value="sale" data-transaction-input />
+            <input
+              type="hidden"
+              name="category_id"
+              value=""
+              disabled
+              data-category-input
+            />
+
+            <div class="overflow-hidden rounded-[2rem] border border-black/10 bg-white/74 shadow-[0_26px_90px_rgba(40,31,20,0.1)] backdrop-blur-xl">
+              <div class="grid md:grid-cols-[18rem_minmax(0,1fr)]">
+                <fieldset class="grid grid-cols-2 border-b border-black/8 md:border-r md:border-b-0">
+                  <legend class="sr-only">Typ transakcji</legend>
+
+                  <button
+                    type="button"
+                    class="transaction-toggle group flex min-h-[7.2rem] cursor-pointer flex-col items-center justify-center gap-4 px-4 py-4 text-left sm:min-h-[9.6rem] sm:px-6 sm:py-5"
+                    data-transaction-toggle
+                    data-value="sale"
+                    data-active="true"
+                    aria-pressed="true"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="h-11 w-11 text-current sm:h-12 sm:w-12"
+                      viewBox="0 0 48 48"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="1.7"
+                    >
+                      <path d="M8.5 22.5 24 10l15.5 12.5"></path>
+                      <path d="M14 19v18.5h20V19"></path>
+                      <path d="M21 37.5V25h6v12.5"></path>
+                      <path d="M33.5 12.5v7"></path>
+                      <path d="M30 16h7"></path>
+                    </svg>
+
+                    <span class="block font-secondary text-[1.08rem] font-semibold tracking-[-0.02em]">
+                      Kup
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="transaction-toggle group flex min-h-[7.2rem] cursor-pointer flex-col items-center justify-center gap-4 border-l border-black/8 px-4 py-4 text-left sm:min-h-[9.6rem] sm:px-6 sm:py-5"
+                    data-transaction-toggle
+                    data-value="rent"
+                    data-active="false"
+                    aria-pressed="false"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="h-11 w-11 text-current sm:h-12 sm:w-12"
+                      viewBox="0 0 48 48"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="1.7"
+                    >
+                      <path d="M13.5 18.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Z"></path>
+                      <path d="M19.5 18.5h12.5"></path>
+                      <path d="M30.5 18.5v7l6 5.5"></path>
+                      <path d="M13.5 18.5v22"></path>
+                      <path d="M13.5 33.5h8.5"></path>
+                      <path d="M22 33.5c4.7 0 8.5-3.8 8.5-8.5"></path>
+                    </svg>
+
+                    <span class="block font-secondary text-[1.08rem] font-semibold tracking-[-0.02em]">
+                      Wynajmij
+                    </span>
+                  </button>
+                </fieldset>
+
+                <div class="min-w-0">
+                  <div class="flex min-h-[5.9rem] items-center gap-3 px-4 py-3.5 sm:min-h-[7.35rem] sm:gap-4 sm:px-6 sm:py-4 md:px-7">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/8 bg-[#f7f2ea] text-[#5f5549] sm:h-12 sm:w-12">
+                      <svg
+                        aria-hidden="true"
+                        class="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="1.8"
+                      >
+                        <path d="M12 21s6-4.4 6-11a6 6 0 1 0-12 0c0 6.6 6 11 6 11Z"></path>
+                        <path d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"></path>
+                      </svg>
+                    </div>
+
+                    <label class="flex min-w-0 flex-1 flex-col gap-1.5" for="homepage-location">
+                      <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
+                        Lokalizacja
+                      </span>
+                      <input
+                        id="homepage-location"
+                        name="location"
+                        type="text"
+                        enterkeyhint="search"
+                        autocomplete="off"
+                        placeholder="Miasto, dzielnica, okolica"
+                        class="w-full border-0 bg-transparent p-0 font-secondary text-[1.16rem] font-medium tracking-[-0.03em] text-[#17130f] outline-none placeholder:text-[#938676] sm:text-[1.55rem]"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="grid border-t border-black/8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_13rem]">
+                    <label class="flex min-h-[4.9rem] flex-col justify-center gap-1.5 px-4 py-3.5 sm:min-h-[5.5rem] sm:px-6 sm:py-4 md:px-7" for="homepage-property-type">
+                      <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
+                        Typ
+                      </span>
+                      <select
+                        id="homepage-property-type"
+                        name="property_type"
+                        class="homepage-select font-secondary"
+                        data-property-type-select
+                      >
+                        <option value="">Dowolny</option>
+                        <option value="apartment">Mieszkania</option>
+                        <option value="house">Domy</option>
+                        <option value="plot">Działki</option>
+                        <option value="room">Pokoje</option>
+                      </select>
+                    </label>
+
+                    <label class="flex min-h-[4.9rem] flex-col justify-center gap-1.5 border-t border-black/8 px-4 py-3.5 sm:min-h-[5.5rem] sm:px-6 sm:py-4 md:border-t-0 md:border-l md:border-black/8 md:px-7" for="homepage-min-price">
+                      <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
+                        Cena od
+                      </span>
+                      <input
+                        id="homepage-min-price"
+                        name="min_price"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        placeholder="np. 450 000"
+                        class="price-input w-full border-0 bg-transparent p-0 font-secondary text-[1.04rem] font-medium tracking-[-0.02em] text-[#17130f] outline-none placeholder:text-[#9a8f81]"
+                        data-price-kind="min"
+                        data-price-input
+                      />
+                    </label>
+
+                    <label class="flex min-h-[4.9rem] flex-col justify-center gap-1.5 border-t border-black/8 px-4 py-3.5 sm:min-h-[5.5rem] sm:px-6 sm:py-4 md:border-t-0 md:border-l md:border-black/8 md:px-7" for="homepage-max-price">
+                      <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
+                        Cena do
+                      </span>
+                      <input
+                        id="homepage-max-price"
+                        name="max_price"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        placeholder="np. 1 250 000"
+                        class="price-input w-full border-0 bg-transparent p-0 font-secondary text-[1.04rem] font-medium tracking-[-0.02em] text-[#17130f] outline-none placeholder:text-[#9a8f81]"
+                        data-price-kind="max"
+                        data-price-input
+                      />
+                    </label>
+
+                    <div class="flex min-h-[4.9rem] border-t border-black/8 sm:min-h-[5.5rem] md:border-t-0 md:border-l md:border-black/8">
+                      <button
+                        type="submit"
+                        class="group/search flex h-full w-full cursor-pointer items-center justify-center gap-2 rounded-none bg-[#19150f] px-5 font-secondary text-[1rem] font-medium text-white transition-all duration-300 hover:bg-[#110e09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#19150f]"
+                      >
+                        <span>Szukaj</span>
+                        <svg
+                          aria-hidden="true"
+                          class="h-4 w-4 transition-transform duration-300 group-hover/search:translate-x-0.5"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="1.7"
+                        >
+                          <path d="M4 10h12"></path>
+                          <path d="m10.5 4.5 5.5 5.5-5.5 5.5"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <script is:inline>
+      const moduleRoot = document.querySelector("[data-search-module]");
+
+      if (moduleRoot instanceof HTMLFormElement) {
+        const transactionInput = moduleRoot.querySelector("[data-transaction-input]");
+        const categoryInput = moduleRoot.querySelector("[data-category-input]");
+        const propertyTypeSelect = moduleRoot.querySelector(
+          "[data-property-type-select]",
+        );
+        const toggles = Array.from(
+          moduleRoot.querySelectorAll("[data-transaction-toggle]"),
+        );
+        const priceInputs = Array.from(
+          moduleRoot.querySelectorAll("[data-price-input]"),
+        );
+        const placeholderPresets = {
+          sale: {
+            min: "np. 450 000",
+            max: "np. 1 250 000",
+          },
+          rent: {
+            min: "np. 2 000",
+            max: "np. 6 500",
+          },
+        };
+        const categoryMap = {
+          apartment: "1",
+          house: "2",
+          plot: "3",
+          room: "",
+          "": "",
+        };
+
+        const formatPriceValue = (value) => {
+          const digits = value.replace(/\D+/g, "");
+
+          if (!digits) {
+            return "";
+          }
+
+          return new Intl.NumberFormat("pl-PL").format(Number(digits));
+        };
+
+        const sanitizePriceValue = (value) => value.replace(/\D+/g, "");
+
+        const syncCategoryInput = () => {
+          if (
+            !(categoryInput instanceof HTMLInputElement) ||
+            !(propertyTypeSelect instanceof HTMLSelectElement)
+          ) {
+            return;
+          }
+
+          const categoryId = categoryMap[propertyTypeSelect.value] ?? "";
+          categoryInput.value = categoryId;
+          categoryInput.disabled = categoryId === "";
+        };
+
+        const setTransaction = (value) => {
+          if (!(transactionInput instanceof HTMLInputElement)) {
+            return;
+          }
+
+          transactionInput.value = value;
+
+          toggles.forEach((toggle) => {
+            if (!(toggle instanceof HTMLButtonElement)) {
+              return;
+            }
+
+            const isActive = toggle.dataset.value === value;
+            toggle.dataset.active = isActive ? "true" : "false";
+            toggle.setAttribute("aria-pressed", String(isActive));
+          });
+
+          priceInputs.forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) {
+              return;
+            }
+
+            const kind = input.dataset.priceKind;
+            if (kind !== "min" && kind !== "max") {
+              return;
+            }
+
+            input.placeholder = placeholderPresets[value]?.[kind] ?? input.placeholder;
+          });
+        };
+
+        toggles.forEach((toggle) => {
+          if (!(toggle instanceof HTMLButtonElement)) {
+            return;
+          }
+
+          toggle.addEventListener("click", () => {
+            const value = toggle.dataset.value;
+            if (!value) {
+              return;
+            }
+
+            setTransaction(value);
+          });
+        });
+
+        if (propertyTypeSelect instanceof HTMLSelectElement) {
+          propertyTypeSelect.addEventListener("change", syncCategoryInput);
+          syncCategoryInput();
+        }
+
+        priceInputs.forEach((input) => {
+          if (!(input instanceof HTMLInputElement)) {
+            return;
+          }
+
+          input.addEventListener("input", () => {
+            input.value = formatPriceValue(input.value);
+          });
+
+          input.addEventListener("blur", () => {
+            input.value = formatPriceValue(input.value);
+          });
+        });
+
+        moduleRoot.addEventListener("submit", () => {
+          priceInputs.forEach((input) => {
+            if (input instanceof HTMLInputElement) {
+              input.value = sanitizePriceValue(input.value);
+            }
+          });
+        });
+      }
+    </script>
+
+    <style>
+      .search-module {
+        animation: fade-up 720ms cubic-bezier(0.2, 1, 0.22, 1) both;
+      }
+
+      .transaction-toggle {
+        color: #2d271f;
+        background: transparent;
+        cursor: pointer;
+        transition:
+          background-color 220ms ease,
+          color 220ms ease,
+          transform 220ms ease,
+          box-shadow 220ms ease;
+      }
+
+      .transaction-toggle:hover {
+        background: rgba(245, 239, 232, 0.72);
+      }
+
+      .transaction-toggle:focus-visible {
+        outline: 2px solid rgba(25, 21, 15, 0.38);
+        outline-offset: -2px;
+      }
+
+      .transaction-toggle[data-active="true"] {
+        color: #17130f;
+        background:
+          radial-gradient(circle at top right, rgba(199, 170, 129, 0.26), transparent 60%),
+          linear-gradient(180deg, rgba(247, 241, 232, 0.98) 0%, rgba(255, 255, 255, 0.85) 100%);
+        box-shadow: inset 0 -1px 0 rgba(18, 17, 14, 0.06);
+      }
+
+      .transaction-toggle[data-active="true"] svg {
+        transform: translateY(-1px);
+      }
+
+      .price-input,
+      #homepage-location,
+      .homepage-select {
+        appearance: none;
+      }
+
+      .homepage-select {
+        width: 100%;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        color: #17130f;
+        font-size: 1.04rem;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .homepage-select option {
+        color: #17130f;
+      }
+
+      .price-input::-webkit-outer-spin-button,
+      .price-input::-webkit-inner-spin-button {
+        appearance: none;
+        margin: 0;
+      }
+
+      .price-input::placeholder,
+      #homepage-location::placeholder {
+        transition: color 180ms ease;
+      }
+
+      .price-input:focus::placeholder,
+      #homepage-location:focus::placeholder {
+        color: rgba(154, 143, 129, 0.58);
+      }
+
+      @keyframes fade-up {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .search-module,
+        .transaction-toggle,
+        .group\/search svg {
+          animation: none;
+          transition: none;
+        }
+      }
+
+      @media (max-width: 767px) {
+        .transaction-toggle[data-active="true"] {
+          box-shadow:
+            inset 0 -1px 0 rgba(18, 17, 14, 0.06),
+            0 18px 34px rgba(31, 24, 17, 0.05);
+        }
+      }
+    </style>
   </body>
 </html>

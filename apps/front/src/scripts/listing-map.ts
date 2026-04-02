@@ -108,7 +108,7 @@ function parseZoom(value: string | undefined): number {
 
 function formatPrice(price: number): string {
   if (!Number.isFinite(price)) {
-    return "Price unavailable";
+    return "Cena niedostępna";
   }
 
   return POPUP_CURRENCY.format(price);
@@ -116,10 +116,48 @@ function formatPrice(price: number): string {
 
 function formatRooms(rooms: number): string {
   if (!Number.isFinite(rooms)) {
-    return "Rooms unavailable";
+    return "Liczba pokoi niedostępna";
   }
 
-  return `${rooms} ${rooms === 1 ? "room" : "rooms"}`;
+  if (rooms === 1) {
+    return "1 pokój";
+  }
+
+  const lastDigit = rooms % 10;
+  const lastTwoDigits = rooms % 100;
+  const usesFewForm =
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14);
+
+  return `${rooms} ${usesFewForm ? "pokoje" : "pokoi"}`;
+}
+
+function formatTransactionType(transactionType: string): string {
+  if (transactionType === "sale") {
+    return "Kupno";
+  }
+
+  if (transactionType === "rent") {
+    return "Wynajem";
+  }
+
+  return transactionType || "Oferta";
+}
+
+function formatOfferCountLabel(count: number): string {
+  if (count === 1) {
+    return "oferta";
+  }
+
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  const usesFewForm =
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14);
+
+  return usesFewForm ? "oferty" : "ofert";
 }
 
 function createMapStyle(pmtilesUrl: string): StyleSpecification {
@@ -137,7 +175,7 @@ function createMapStyle(pmtilesUrl: string): StyleSpecification {
       },
     },
     layers: layers(PROTOMAPS_SOURCE_ID, namedFlavor("grayscale"), {
-      lang: "en",
+      lang: "pl",
     }),
   };
 }
@@ -196,10 +234,10 @@ function normalizeListingProperties(
   return {
     id,
     slug: String(properties.slug ?? ""),
-    title: String(properties.title ?? "Listing"),
+    title: String(properties.title ?? "Oferta"),
     price: Number(properties.price ?? 0),
     rooms: Number(properties.rooms ?? 0),
-    transactionType: String(properties.transactionType ?? "listing"),
+    transactionType: String(properties.transactionType ?? ""),
     thumbnailUrl: String(properties.thumbnailUrl || PLACEHOLDER_THUMBNAIL),
     city: String(properties.city ?? ""),
     street: String(properties.street ?? ""),
@@ -225,7 +263,7 @@ function createPopupContent(properties: ListingProperties): HTMLElement {
   const image = document.createElement("img");
   image.className = "listing-popup__image";
   image.src = properties.thumbnailUrl || PLACEHOLDER_THUMBNAIL;
-  image.alt = properties.title || "Listing";
+  image.alt = properties.title || "Oferta";
   image.loading = "lazy";
 
   const body = document.createElement("div");
@@ -233,16 +271,16 @@ function createPopupContent(properties: ListingProperties): HTMLElement {
 
   const eyebrow = document.createElement("div");
   eyebrow.className = "listing-popup__eyebrow";
-  eyebrow.textContent = properties.transactionType || "listing";
+  eyebrow.textContent = formatTransactionType(properties.transactionType);
 
   const title = document.createElement("h3");
   title.className = "listing-popup__title";
-  title.textContent = properties.title || "Listing";
+  title.textContent = properties.title || "Oferta";
 
   const meta = document.createElement("p");
   meta.className = "listing-popup__meta";
-  meta.textContent = `${properties.street || "Address unavailable"}, ${
-    properties.city || "Poland"
+  meta.textContent = `${properties.street || "Adres niedostępny"}, ${
+    properties.city || "Polska"
   }`;
 
   const details = document.createElement("div");
@@ -279,11 +317,11 @@ function createListingCard(feature: ListingFeature): HTMLButtonElement {
 
   const eyebrow = document.createElement("div");
   eyebrow.className = "listing-map__card-eyebrow";
-  eyebrow.textContent = feature.properties.transactionType || "listing";
+  eyebrow.textContent = formatTransactionType(feature.properties.transactionType);
 
   const title = document.createElement("h3");
   title.className = "listing-map__card-title";
-  title.textContent = feature.properties.title || "Listing";
+  title.textContent = feature.properties.title || "Oferta";
 
   const meta = document.createElement("div");
   meta.className = "listing-map__card-meta";
@@ -299,8 +337,8 @@ function createListingCard(feature: ListingFeature): HTMLButtonElement {
 
   const location = document.createElement("div");
   location.className = "listing-map__card-location";
-  location.textContent = `${feature.properties.street || "Address unavailable"}, ${
-    feature.properties.city || "Poland"
+  location.textContent = `${feature.properties.street || "Adres niedostępny"}, ${
+    feature.properties.city || "Polska"
   }`;
 
   card.appendChild(eyebrow);
@@ -419,15 +457,13 @@ export function mountListingMap(root: HTMLElement): () => void {
     emptyState.hidden = features.length > 0;
 
     if (features.length === 0) {
-      setListSummary("Move the map to search for homes in another area.");
+      setListSummary("Przesuń mapę, aby wyszukać oferty w innej okolicy.");
       setActiveListing(null);
       return;
     }
 
     setListSummary(
-      `${features.length} ${
-        features.length === 1 ? "property" : "properties"
-      } in view`,
+      `${features.length} ${formatOfferCountLabel(features.length)} w aktualnym widoku`,
     );
 
     const fragment = document.createDocumentFragment();
@@ -540,7 +576,7 @@ export function mountListingMap(root: HTMLElement): () => void {
         "Failed to refresh listings for the current viewport",
         error,
       );
-      setStatus("Unable to load listings for this area.");
+      setStatus("Nie udało się wczytać ofert dla tego obszaru.");
     }
   };
 
@@ -611,7 +647,7 @@ export function mountListingMap(root: HTMLElement): () => void {
   const handleMapError = (event: { error?: Error }) => {
     if (event.error) {
       console.error("MapLibre rendering error", event.error);
-      setStatus("The map could not be rendered.");
+      setStatus("Nie udało się wyświetlić mapy.");
     }
   };
 
@@ -637,15 +673,15 @@ export function mountListingMap(root: HTMLElement): () => void {
         "circle-color": [
           "step",
           ["get", "point_count"],
-          "#d35d6e",
+          "#8f7b61",
           25,
-          "#c54c62",
+          "#6f5d49",
           100,
-          "#9f3a4d",
+          "#493c2f",
         ],
         "circle-radius": ["step", ["get", "point_count"], 18, 25, 26, 100, 34],
         "circle-stroke-width": 2,
-        "circle-stroke-color": "#fff7f7",
+        "circle-stroke-color": "#fffaf4",
         "circle-opacity": 0.92,
       },
     });
@@ -671,7 +707,7 @@ export function mountListingMap(root: HTMLElement): () => void {
       source: LISTINGS_SOURCE_ID,
       filter: ["!", ["has", "point_count"]],
       paint: {
-        "circle-color": "#ff5a5f",
+        "circle-color": "#201913",
         "circle-radius": 7,
         "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff",
