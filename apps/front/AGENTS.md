@@ -1,44 +1,67 @@
-# Cloudflare Workers
+# Frontend package instructions
 
-STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated. Always retrieve current documentation before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, AI, or Agents SDK task.
+This file adds `apps/front`-specific guidance on top of the repo-root `AGENTS.md`. Keep it focused on work inside this package.
 
-## Docs
+## Package scope
 
-- https://developers.cloudflare.com/workers/
-- MCP: `https://docs.mcp.cloudflare.com/mcp`
+- Package: `front`
+- Runtime: Astro SSR on Cloudflare Workers with React islands
+- Monorepo rule: prefer target-scoped commands; do not run whole-repo tasks unless the user asks
 
-For all limits and quotas, retrieve from the product's `/platform/limits/` page. eg. `/workers/platform/limits`
+## Start here
+
+- Read the relevant route, component, and helper before editing
+- Check `apps/front/package.json`, `apps/front/astro.config.mjs`, and `apps/front/wrangler.jsonc` when changing build or runtime behavior
+- Run commands from the repo root unless there is a strong reason to `cd` into `apps/front`
 
 ## Commands
 
-| Command               | Purpose                   |
-| --------------------- | ------------------------- |
-| `npx wrangler dev`    | Local development         |
-| `npx wrangler deploy` | Deploy to Cloudflare      |
-| `npx wrangler types`  | Generate TypeScript types |
+Use the smallest command that validates the change:
 
-Run `wrangler types` after changing bindings in wrangler.jsonc.
+- `pnpm dev:front` for day-to-day frontend development
+- `pnpm --filter front lint` for Astro checks
+- `pnpm --filter front check-types` for Astro + TypeScript + Worker types
+- `pnpm --filter front build` for production build verification
+- `pnpm --filter front cf-typegen` after changing Worker bindings or `wrangler.jsonc`
+- `pnpm --filter front preview` only when you need local Worker runtime behavior
 
-## Node.js Compatibility
+Do not default to `wrangler dev` for normal UI work; `astro dev` is the standard local loop here.
 
-https://developers.cloudflare.com/workers/runtime-apis/nodejs/
+## Architecture and conventions
 
-## Errors
+- Prefer Astro pages for route composition and SSR data loading
+- Use React islands only for interactive surfaces, not for whole-page rewrites
+- Reuse existing fetch helpers before adding new API access patterns
+- Keep API calls aligned with the existing split:
+  - browser-facing URLs use `PUBLIC_API_BASE_URL`
+  - SSR/server-side fetches use `API_SERVER_BASE_URL`
+- Preserve cookie-based auth behavior; do not bypass helpers that forward `auth_session`
+- Routes with live backend data should stay SSR-driven; do not switch them to static rendering unless the task explicitly requires it
 
-- **Error 1102** (CPU/Memory exceeded): Retrieve limits from `/workers/platform/limits/`
-- **All errors**: https://developers.cloudflare.com/workers/observability/errors/
+## Backend contract guardrails
 
-## Product Docs
+- Do not change request or response shapes for existing endpoints unless the task also updates `apps/server-axum`
+- Login and register currently send only `email` and `password`; `confirmPassword` stays front-end validation only
+- Preserve current endpoint expectations around `/auth/*` and `/api/v1/*`
 
-Retrieve API references and limits from:
-`/kv/` · `/r2/` · `/d1/` · `/durable-objects/` · `/queues/` · `/vectorize/` · `/workers-ai/` · `/agents/`
+## UI expectations
 
-## Auth Design-to-Code Contract
+- Preserve the established marketplace visual language across public pages, auth, detail pages, and dashboard
+- Reuse local `shadcn`-style primitives from `src/components/ui` before introducing new abstractions
+- Prefer extending existing domain components over duplicating similar UI in a new folder
 
-- Treat `design.pen` as the source of truth for auth UX before changing `/login` or `/register`.
-- Current route mapping is fixed: `dT0Ca` -> `/login`, `m1uNU` -> `/register`.
-- If auth copy or structure changes, update both the Astro implementation and `AUTH_FLOW.md` in the same slice.
-- Keep `/` as a redirect-only route. Do not reintroduce a full auth page there.
-- Reuse the existing auth shell and shadcn primitives in `src/components/auth` before creating new auth-specific markup.
-- Do not invent a new visual direction for auth in code. If the desired UI differs from Pencil, update Pencil first or in the same task.
-- In summaries, PR notes, or review comments for auth work, include the Pencil frame IDs you matched against.
+## Cloudflare guidance
+
+Cloudflare Workers APIs, bindings, and limits change over time. Before making Workers-specific decisions, retrieve current Cloudflare docs for the exact product you are using.
+
+Useful starting points:
+
+- Workers docs: `https://developers.cloudflare.com/workers/`
+- Node.js compatibility: `https://developers.cloudflare.com/workers/runtime-apis/nodejs/`
+- Errors and limits: `https://developers.cloudflare.com/workers/observability/errors/`
+
+## Validation checklist
+
+- UI/component change: run `pnpm --filter front check-types`
+- Route or data-loading change: run `pnpm --filter front check-types` and `pnpm --filter front build`
+- Worker config or binding change: run `pnpm --filter front cf-typegen` and then `pnpm --filter front check-types`

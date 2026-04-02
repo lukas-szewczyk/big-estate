@@ -57,6 +57,10 @@ pnpm deploy:front
 - `packages/typescript-config`: współdzielony TypeScript config
 - `packages/ui`: eksperymentalna paczka UI, obecnie auth w `front` korzysta z lokalnego `src/components/ui`
 
+## Architektura
+
+- Diagram C4 systemu znajdziesz w [`docs/architecture/c4.md`](docs/architecture/c4.md)
+
 ## Auth v1
 
 Aktualny zakres auth:
