@@ -58,9 +58,27 @@ services:
     networks:
       - autobase
 
+  photon:
+    image: rtuszik/photon-docker:2.1.1
+    container_name: photon
+    profiles:
+      - geocoder
+    restart: unless-stopped
+    environment:
+      - REGION=europe
+      - UPDATE_STRATEGY=DISABLED
+    ports:
+      - 2322:2322
+    volumes:
+      - photon_data:/photon/data
+    networks:
+      - autobase
+
 volumes:
   console_postgres:
     name: console_postgres
+  photon_data:
+    name: photon_data
 
 networks:
   autobase:

@@ -19,10 +19,16 @@ const DEFAULT_PMTILES_URL =
 const DEFAULT_LISTINGS_API_URL = "/api/listings";
 const PROTOMAPS_SOURCE_ID = "protomaps";
 const LISTINGS_SOURCE_ID = "listings";
+const DRAW_SOURCE_ID = "listing-draw";
 const CLUSTERS_LAYER_ID = "listing-clusters";
 const CLUSTER_COUNT_LAYER_ID = "listing-cluster-count";
 const UNCLUSTERED_LAYER_ID = "listing-points";
+const DRAW_LINE_LAYER_ID = "listing-draw-line";
+const DRAW_FILL_LAYER_ID = "listing-draw-fill";
 const PLACEHOLDER_THUMBNAIL = "/listing-placeholder.svg";
+const FOCUSED_LISTING_ZOOM = 13;
+const DRAW_SAMPLE_DISTANCE_PX = 10;
+const DRAW_MIN_AREA_PX = 600;
 const POPUP_CURRENCY = new Intl.NumberFormat("pl-PL", {
   style: "currency",
   currency: "PLN",
@@ -55,12 +61,62 @@ type ListingFeatureCollection = {
   features: ListingFeature[];
 };
 
+type SearchFilters = Partial<{
+  transaction_type: "sale" | "rent";
+  category_id: number;
+  min_price: number;
+  max_price: number;
+  rooms: number;
+}>;
+
+type Bbox = [number, number, number, number];
+type DrawPoint = [number, number];
+
+type SearchPolygon = {
+  type: "Polygon";
+  coordinates: [DrawPoint[]];
+};
+
+type SearchPayload = SearchFilters & {
+  shape:
+    | {
+        type: "bbox";
+        bbox: Bbox;
+      }
+    | {
+        type: "polygon";
+        geometry: SearchPolygon;
+      };
+};
+
+type DrawFeatureCollection = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry:
+      | {
+          type: "LineString";
+          coordinates: DrawPoint[];
+        }
+      | SearchPolygon;
+    properties: {
+      kind: "line" | "polygon";
+    };
+  }>;
+};
+
+type DrawMode = "browse" | "draw-armed" | "drawing" | "draw-applied";
+type StatusKind = "idle" | "info" | "error";
+
 const EMPTY_FEATURE_COLLECTION: ListingFeatureCollection = {
   type: "FeatureCollection",
   features: [],
 };
 
-const FOCUSED_LISTING_ZOOM = 13;
+const EMPTY_DRAW_COLLECTION: DrawFeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
 
 function debounce<T extends (...args: never[]) => void>(
   callback: T,
@@ -104,6 +160,32 @@ function parseCenter(value: string | undefined): [number, number] {
 function parseZoom(value: string | undefined): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : DEFAULT_ZOOM;
+}
+
+function parseBounds(value: string | undefined): [number, number, number, number] | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === 4 &&
+      parsed.every((coordinate) => Number.isFinite(coordinate))
+    ) {
+      return [
+        Number(parsed[0]),
+        Number(parsed[1]),
+        Number(parsed[2]),
+        Number(parsed[3]),
+      ];
+    }
+  } catch (error) {
+    console.warn("Invalid map bounds configuration", error);
+  }
+
+  return null;
 }
 
 function formatPrice(price: number): string {
@@ -182,6 +264,15 @@ function createMapStyle(pmtilesUrl: string): StyleSpecification {
 
 function getListingsSource(map: maplibregl.Map): GeoJSONSource | null {
   const source = map.getSource(LISTINGS_SOURCE_ID);
+  if (!source || !("setData" in source)) {
+    return null;
+  }
+
+  return source as GeoJSONSource;
+}
+
+function getDrawSource(map: maplibregl.Map): GeoJSONSource | null {
+  const source = map.getSource(DRAW_SOURCE_ID);
   if (!source || !("setData" in source)) {
     return null;
   }
@@ -348,20 +439,184 @@ function createListingCard(feature: ListingFeature): HTMLButtonElement {
   return card;
 }
 
-function buildListingsUrl(endpoint: string, map: maplibregl.Map): string {
-  const bounds = map.getBounds();
-  const bbox = [
-    bounds.getWest(),
-    bounds.getSouth(),
-    bounds.getEast(),
-    bounds.getNorth(),
-  ]
-    .map((value) => value.toFixed(6))
-    .join(",");
+function parsePositiveInteger(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
 
-  const url = new URL(endpoint, window.location.origin);
-  url.searchParams.set("bbox", bbox);
-  return url.toString();
+  const parsed = Number(value.trim());
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseNonNegativeNumber(value: string | null): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalizedValue = value.trim().replace(/\s+/g, "");
+  if (normalizedValue.length === 0) {
+    return undefined;
+  }
+
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function parseSearchFiltersFromUrl(): SearchFilters {
+  const params = new URLSearchParams(window.location.search);
+  const transactionType = params.get("transaction_type");
+  const filters: SearchFilters = {};
+
+  if (transactionType === "sale" || transactionType === "rent") {
+    filters.transaction_type = transactionType;
+  }
+
+  const categoryId = parsePositiveInteger(params.get("category_id"));
+  if (typeof categoryId === "number") {
+    filters.category_id = categoryId;
+  }
+
+  const minPrice = parseNonNegativeNumber(params.get("min_price"));
+  if (typeof minPrice === "number") {
+    filters.min_price = minPrice;
+  }
+
+  const maxPrice = parseNonNegativeNumber(params.get("max_price"));
+  if (typeof maxPrice === "number") {
+    filters.max_price = maxPrice;
+  }
+
+  const rooms = parsePositiveInteger(params.get("rooms"));
+  if (typeof rooms === "number") {
+    filters.rooms = rooms;
+  }
+
+  return filters;
+}
+
+function buildSearchPayload(
+  map: maplibregl.Map,
+  polygon: SearchPolygon | null,
+): SearchPayload {
+  const filters = parseSearchFiltersFromUrl();
+
+  if (polygon) {
+    return {
+      ...filters,
+      shape: {
+        type: "polygon",
+        geometry: polygon,
+      },
+    };
+  }
+
+  const bounds = map.getBounds();
+  return {
+    ...filters,
+    shape: {
+      type: "bbox",
+      bbox: [
+        Number(bounds.getWest().toFixed(6)),
+        Number(bounds.getSouth().toFixed(6)),
+        Number(bounds.getEast().toFixed(6)),
+        Number(bounds.getNorth().toFixed(6)),
+      ],
+    },
+  };
+}
+
+function areDrawPointsEqual([lngA, latA]: DrawPoint, [lngB, latB]: DrawPoint) {
+  return Math.abs(lngA - lngB) < 1e-9 && Math.abs(latA - latB) < 1e-9;
+}
+
+function normalizeDrawRing(points: DrawPoint[]): DrawPoint[] {
+  const normalized: DrawPoint[] = [];
+
+  for (const point of points) {
+    const previous = normalized[normalized.length - 1];
+    if (!previous || !areDrawPointsEqual(previous, point)) {
+      normalized.push(point);
+    }
+  }
+
+  if (normalized.length < 3) {
+    return [];
+  }
+
+  const first = normalized[0];
+  const last = normalized[normalized.length - 1];
+  if (!last || !areDrawPointsEqual(first, last)) {
+    normalized.push(first);
+  }
+
+  return normalized.length >= 4 ? normalized : [];
+}
+
+function buildDrawFeatureCollection(
+  sketchCoordinates: DrawPoint[],
+  polygon: SearchPolygon | null,
+): DrawFeatureCollection {
+  const features: DrawFeatureCollection["features"] = [];
+
+  if (sketchCoordinates.length >= 2) {
+    features.push({
+      type: "Feature",
+      geometry: {
+        type: "LineString",
+        coordinates: sketchCoordinates,
+      },
+      properties: {
+        kind: "line",
+      },
+    });
+  }
+
+  if (polygon) {
+    features.push({
+      type: "Feature",
+      geometry: polygon,
+      properties: {
+        kind: "polygon",
+      },
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+}
+
+function computePolygonArea(points: Array<[number, number]>): number {
+  if (points.length < 3) {
+    return 0;
+  }
+
+  let area = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const [currentX, currentY] = points[index];
+    const [nextX, nextY] = points[(index + 1) % points.length];
+    area += currentX * nextY - nextX * currentY;
+  }
+
+  return Math.abs(area / 2);
+}
+
+function getRelativePoint(
+  canvas: HTMLElement,
+  event: PointerEvent,
+): [number, number] {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+  const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
+  return [x, y];
+}
+
+function getDistanceBetweenPoints(
+  [firstX, firstY]: [number, number],
+  [secondX, secondY]: [number, number],
+) {
+  return Math.hypot(secondX - firstX, secondY - firstY);
 }
 
 export function mountListingMap(root: HTMLElement): () => void {
@@ -376,16 +631,35 @@ export function mountListingMap(root: HTMLElement): () => void {
   const listSummary = root.querySelector<HTMLElement>(
     "[data-listing-list-summary]",
   );
+  const drawToggle = root.querySelector<HTMLButtonElement>("[data-draw-toggle]");
+  const clearDrawing = root.querySelector<HTMLButtonElement>("[data-clear-drawing]");
+  const drawingOverlay = root.querySelector<HTMLElement>(
+    "[data-listing-map-drawing-overlay]",
+  );
+  const drawControls =
+    drawToggle instanceof HTMLButtonElement &&
+    clearDrawing instanceof HTMLButtonElement &&
+    drawingOverlay instanceof HTMLElement
+      ? {
+          drawToggle,
+          clearDrawing,
+          drawingOverlay,
+        }
+      : null;
 
   if (!canvas || !listItems || !emptyState || !listSummary) {
     throw new Error("Listing map canvas is missing");
   }
 
   const initialCenter = parseCenter(root.dataset.initialCenter);
+  const initialBounds = parseBounds(root.dataset.initialBounds);
   const initialZoom = parseZoom(root.dataset.initialZoom);
   const pmtilesUrl = root.dataset.pmtilesUrl || DEFAULT_PMTILES_URL;
   const listingsApiUrl =
     root.dataset.listingsApiUrl || DEFAULT_LISTINGS_API_URL;
+  const drawToSearchEnabled =
+    root.dataset.enableDrawToSearch === "true" &&
+    drawControls !== null;
 
   acquirePmtilesProtocol();
 
@@ -393,6 +667,12 @@ export function mountListingMap(root: HTMLElement): () => void {
   let abortController: AbortController | null = null;
   let isDestroyed = false;
   let activeListingId: number | null = null;
+  let statusKind: StatusKind = "idle";
+  let drawMode: DrawMode = "browse";
+  let drawPointerId: number | null = null;
+  let drawScreenPoints: Array<[number, number]> = [];
+  let drawCoordinates: DrawPoint[] = [];
+  let activeSearchPolygon: SearchPolygon | null = null;
   const featuresById = new Map<number, ListingFeature>();
 
   const map = new maplibregl.Map({
@@ -402,9 +682,12 @@ export function mountListingMap(root: HTMLElement): () => void {
     zoom: initialZoom,
   });
 
-  map.addControl(new maplibregl.NavigationControl(), "top-right");
+  map.addControl(new maplibregl.NavigationControl(), "bottom-right");
 
-  const setStatus = (message: string | null) => {
+  const setStatus = (
+    message: string | null,
+    kind: Exclude<StatusKind, "idle"> = "error",
+  ) => {
     if (!status) {
       return;
     }
@@ -412,13 +695,21 @@ export function mountListingMap(root: HTMLElement): () => void {
     if (!message) {
       status.textContent = "";
       status.hidden = true;
+      statusKind = "idle";
       root.dataset.status = "idle";
       return;
     }
 
     status.hidden = false;
     status.textContent = message;
-    root.dataset.status = "error";
+    statusKind = kind;
+    root.dataset.status = kind;
+  };
+
+  const clearInfoStatus = () => {
+    if (statusKind === "info") {
+      setStatus(null);
+    }
   };
 
   const setListSummary = (message: string) => {
@@ -452,18 +743,28 @@ export function mountListingMap(root: HTMLElement): () => void {
     });
   };
 
+  const getSearchContextLabel = () =>
+    activeSearchPolygon ? "w narysowanym obszarze" : "w aktualnym widoku";
+
   const renderListingList = (features: ListingFeature[]) => {
     listItems.replaceChildren();
     emptyState.hidden = features.length > 0;
+    emptyState.textContent = activeSearchPolygon
+      ? "Brak ofert w narysowanym obszarze"
+      : "Brak ofert w tym obszarze";
 
     if (features.length === 0) {
-      setListSummary("Przesuń mapę, aby wyszukać oferty w innej okolicy.");
+      setListSummary(
+        activeSearchPolygon
+          ? "Nie znaleźliśmy ofert w narysowanym obszarze."
+          : "Przesuń mapę, aby wyszukać oferty w innej okolicy.",
+      );
       setActiveListing(null);
       return;
     }
 
     setListSummary(
-      `${features.length} ${formatOfferCountLabel(features.length)} w aktualnym widoku`,
+      `${features.length} ${formatOfferCountLabel(features.length)} ${getSearchContextLabel()}`,
     );
 
     const fragment = document.createDocumentFragment();
@@ -526,6 +827,69 @@ export function mountListingMap(root: HTMLElement): () => void {
     map.getCanvas().style.cursor = "";
   };
 
+  const setDrawSourceData = (
+    sketchCoordinates: DrawPoint[] = [],
+    polygon: SearchPolygon | null = activeSearchPolygon,
+  ) => {
+    if (!drawToSearchEnabled || !drawControls) {
+      return;
+    }
+
+    const source = getDrawSource(map);
+    source?.setData(buildDrawFeatureCollection(sketchCoordinates, polygon));
+  };
+
+  const setMapInteractionsEnabled = (enabled: boolean) => {
+    if (enabled) {
+      map.dragPan.enable();
+      map.scrollZoom.enable();
+      map.boxZoom.enable();
+      map.doubleClickZoom.enable();
+      map.touchZoomRotate.enable();
+      map.keyboard.enable();
+      return;
+    }
+
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.boxZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoomRotate.disable();
+    map.keyboard.disable();
+  };
+
+  const syncDrawUi = () => {
+    root.dataset.drawMode = drawMode;
+
+    if (!drawToSearchEnabled || !drawControls) {
+      return;
+    }
+
+    drawControls.drawToggle.dataset.active =
+      drawMode === "draw-armed" || drawMode === "drawing" ? "true" : "false";
+    drawControls.drawToggle.setAttribute(
+      "aria-pressed",
+      drawMode === "draw-armed" || drawMode === "drawing" ? "true" : "false",
+    );
+    drawControls.drawToggle.textContent =
+      drawMode === "draw-armed" || drawMode === "drawing"
+        ? "Anuluj rysowanie"
+        : "Rysuj obszar";
+
+    drawControls.clearDrawing.disabled = drawMode !== "draw-applied";
+    drawControls.drawingOverlay.hidden =
+      drawMode !== "draw-armed" && drawMode !== "drawing";
+
+    setMapInteractionsEnabled(
+      drawMode !== "draw-armed" && drawMode !== "drawing",
+    );
+  };
+
+  const setDrawMode = (nextMode: DrawMode) => {
+    drawMode = nextMode;
+    syncDrawUi();
+  };
+
   const fetchListings = async () => {
     if (isDestroyed) {
       return;
@@ -540,10 +904,13 @@ export function mountListingMap(root: HTMLElement): () => void {
     abortController = new AbortController();
 
     try {
-      const response = await fetch(buildListingsUrl(listingsApiUrl, map), {
+      const response = await fetch(listingsApiUrl, {
+        method: "POST",
         headers: {
           accept: "application/json",
+          "content-type": "application/json",
         },
+        body: JSON.stringify(buildSearchPayload(map, activeSearchPolygon)),
         signal: abortController.signal,
       });
 
@@ -566,7 +933,11 @@ export function mountListingMap(root: HTMLElement): () => void {
         setActiveListing(null);
       }
 
-      setStatus(null);
+      if (statusKind !== "error") {
+        clearInfoStatus();
+      } else {
+        setStatus(null);
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -581,6 +952,134 @@ export function mountListingMap(root: HTMLElement): () => void {
   };
 
   const refreshListings = debounce(fetchListings, 300);
+
+  const clearActiveDrawing = async () => {
+    activeSearchPolygon = null;
+    drawCoordinates = [];
+    drawScreenPoints = [];
+    drawPointerId = null;
+    setDrawSourceData([], null);
+    setDrawMode("browse");
+    clearInfoStatus();
+    await fetchListings();
+  };
+
+  const cancelDrawing = () => {
+    drawCoordinates = [];
+    drawScreenPoints = [];
+    drawPointerId = null;
+    setDrawSourceData([], activeSearchPolygon);
+    setDrawMode(activeSearchPolygon ? "draw-applied" : "browse");
+    clearInfoStatus();
+  };
+
+  const finalizeDrawing = async () => {
+    drawPointerId = null;
+
+    if (
+      drawCoordinates.length < 3 ||
+      computePolygonArea(drawScreenPoints) < DRAW_MIN_AREA_PX
+    ) {
+      drawCoordinates = [];
+      drawScreenPoints = [];
+      setDrawSourceData([], activeSearchPolygon);
+      setDrawMode(activeSearchPolygon ? "draw-applied" : "browse");
+      setStatus(
+        "Narysowany obszar jest zbyt mały. Spróbuj narysować większy kształt.",
+        "info",
+      );
+      return;
+    }
+
+    const ring = normalizeDrawRing(drawCoordinates);
+    if (ring.length === 0) {
+      drawCoordinates = [];
+      drawScreenPoints = [];
+      setDrawSourceData([], activeSearchPolygon);
+      setDrawMode(activeSearchPolygon ? "draw-applied" : "browse");
+      setStatus(
+        "Nie udało się domknąć obszaru. Spróbuj narysować kształt ponownie.",
+        "info",
+      );
+      return;
+    }
+
+    activeSearchPolygon = {
+      type: "Polygon",
+      coordinates: [ring],
+    };
+    drawCoordinates = [];
+    drawScreenPoints = [];
+    setDrawSourceData([], activeSearchPolygon);
+    setDrawMode("draw-applied");
+    clearInfoStatus();
+    await fetchListings();
+  };
+
+  const startDrawing = (event: PointerEvent) => {
+    if (!drawToSearchEnabled || !drawControls || drawMode !== "draw-armed") {
+      return;
+    }
+
+    event.preventDefault();
+
+    const screenPoint = getRelativePoint(canvas, event);
+    const { lng, lat } = map.unproject(screenPoint);
+
+    drawPointerId = event.pointerId;
+    drawScreenPoints = [screenPoint];
+    drawCoordinates = [[lng, lat]];
+    activeSearchPolygon = null;
+    setDrawMode("drawing");
+    drawControls.drawingOverlay.setPointerCapture(event.pointerId);
+    setDrawSourceData(drawCoordinates, null);
+  };
+
+  const extendDrawing = (event: PointerEvent) => {
+    if (
+      !drawToSearchEnabled ||
+      !drawControls ||
+      drawMode !== "drawing" ||
+      drawPointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const screenPoint = getRelativePoint(canvas, event);
+    const previousPoint = drawScreenPoints[drawScreenPoints.length - 1];
+    if (
+      previousPoint &&
+      getDistanceBetweenPoints(previousPoint, screenPoint) <
+        DRAW_SAMPLE_DISTANCE_PX
+    ) {
+      return;
+    }
+
+    const { lng, lat } = map.unproject(screenPoint);
+    drawScreenPoints.push(screenPoint);
+    drawCoordinates.push([lng, lat]);
+    setDrawSourceData(drawCoordinates, null);
+  };
+
+  const finishDrawing = async (event: PointerEvent) => {
+    if (
+      !drawToSearchEnabled ||
+      !drawControls ||
+      drawMode !== "drawing" ||
+      drawPointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    extendDrawing(event);
+    if (drawControls.drawingOverlay.hasPointerCapture(event.pointerId)) {
+      drawControls.drawingOverlay.releasePointerCapture(event.pointerId);
+    }
+    await finalizeDrawing();
+  };
 
   const handleClusterClick = async (event: MapLayerMouseEvent) => {
     const feature = event.features?.[0];
@@ -651,6 +1150,53 @@ export function mountListingMap(root: HTMLElement): () => void {
     }
   };
 
+  const handleMoveEnd = () => {
+    if (drawMode === "draw-applied") {
+      return;
+    }
+
+    refreshListings();
+  };
+
+  const handleDrawToggleClick = async () => {
+    if (!drawToSearchEnabled || !drawControls) {
+      return;
+    }
+
+    if (drawMode === "draw-armed" || drawMode === "drawing") {
+      cancelDrawing();
+      return;
+    }
+
+    if (drawMode === "draw-applied") {
+      await clearActiveDrawing();
+    }
+
+    setDrawMode("draw-armed");
+    setStatus(
+      "Przytrzymaj i narysuj obszar na mapie, aby zawęzić wyniki.",
+      "info",
+    );
+  };
+
+  const handleClearDrawingClick = async () => {
+    if (drawMode !== "draw-applied") {
+      return;
+    }
+
+    await clearActiveDrawing();
+  };
+
+  const handleWindowKeydown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (drawMode === "draw-armed" || drawMode === "drawing") {
+      cancelDrawing();
+    }
+  };
+
   const handleLoad = async () => {
     if (isDestroyed) {
       return;
@@ -662,6 +1208,35 @@ export function mountListingMap(root: HTMLElement): () => void {
       cluster: true,
       clusterMaxZoom: 14,
       clusterRadius: 50,
+    });
+
+    map.addSource(DRAW_SOURCE_ID, {
+      type: "geojson",
+      data: EMPTY_DRAW_COLLECTION,
+    });
+
+    map.addLayer({
+      id: DRAW_FILL_LAYER_ID,
+      type: "fill",
+      source: DRAW_SOURCE_ID,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      paint: {
+        "fill-color": "#8a7760",
+        "fill-opacity": 0.16,
+        "fill-outline-color": "#493c2f",
+      },
+    });
+
+    map.addLayer({
+      id: DRAW_LINE_LAYER_ID,
+      type: "line",
+      source: DRAW_SOURCE_ID,
+      filter: ["==", ["geometry-type"], "LineString"],
+      paint: {
+        "line-color": "#493c2f",
+        "line-width": 3,
+        "line-opacity": 0.94,
+      },
     });
 
     map.addLayer({
@@ -720,9 +1295,23 @@ export function mountListingMap(root: HTMLElement): () => void {
     map.on("mouseleave", CLUSTERS_LAYER_ID, clearPointerCursor);
     map.on("mouseenter", UNCLUSTERED_LAYER_ID, setPointerCursor);
     map.on("mouseleave", UNCLUSTERED_LAYER_ID, clearPointerCursor);
-    map.on("moveend", refreshListings);
+
+    if (initialBounds) {
+      map.fitBounds(
+        [
+          [initialBounds[0], initialBounds[1]],
+          [initialBounds[2], initialBounds[3]],
+        ],
+        {
+          duration: 0,
+          maxZoom: 14,
+          padding: 80,
+        },
+      );
+    }
 
     await fetchListings();
+    map.on("moveend", handleMoveEnd);
   };
 
   const handleListClick = (event: Event) => {
@@ -762,6 +1351,17 @@ export function mountListingMap(root: HTMLElement): () => void {
   map.on("load", handleLoad);
   map.on("error", handleMapError);
 
+  if (drawToSearchEnabled && drawControls) {
+    drawControls.drawToggle.addEventListener("click", handleDrawToggleClick);
+    drawControls.clearDrawing.addEventListener("click", handleClearDrawingClick);
+    drawControls.drawingOverlay.addEventListener("pointerdown", startDrawing);
+    drawControls.drawingOverlay.addEventListener("pointermove", extendDrawing);
+    drawControls.drawingOverlay.addEventListener("pointerup", finishDrawing);
+    drawControls.drawingOverlay.addEventListener("pointercancel", finishDrawing);
+    window.addEventListener("keydown", handleWindowKeydown);
+    syncDrawUi();
+  }
+
   return () => {
     if (isDestroyed) {
       return;
@@ -772,10 +1372,11 @@ export function mountListingMap(root: HTMLElement): () => void {
     abortController?.abort();
     activePopup?.remove();
     clearPointerCursor();
+    setMapInteractionsEnabled(true);
 
     map.off("load", handleLoad);
     map.off("error", handleMapError);
-    map.off("moveend", refreshListings);
+    map.off("moveend", handleMoveEnd);
     map.off("click", CLUSTERS_LAYER_ID, handleClusterClick);
     map.off("click", UNCLUSTERED_LAYER_ID, handlePointClick);
     map.off("mouseenter", CLUSTERS_LAYER_ID, setPointerCursor);
@@ -783,6 +1384,17 @@ export function mountListingMap(root: HTMLElement): () => void {
     map.off("mouseenter", UNCLUSTERED_LAYER_ID, setPointerCursor);
     map.off("mouseleave", UNCLUSTERED_LAYER_ID, clearPointerCursor);
     listItems.removeEventListener("click", handleListClick);
+
+    if (drawToSearchEnabled && drawControls) {
+      drawControls.drawToggle.removeEventListener("click", handleDrawToggleClick);
+      drawControls.clearDrawing.removeEventListener("click", handleClearDrawingClick);
+      drawControls.drawingOverlay.removeEventListener("pointerdown", startDrawing);
+      drawControls.drawingOverlay.removeEventListener("pointermove", extendDrawing);
+      drawControls.drawingOverlay.removeEventListener("pointerup", finishDrawing);
+      drawControls.drawingOverlay.removeEventListener("pointercancel", finishDrawing);
+      window.removeEventListener("keydown", handleWindowKeydown);
+    }
+
     map.remove();
     releasePmtilesProtocol();
   };

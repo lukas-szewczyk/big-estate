@@ -4,17 +4,21 @@ import "maplibre-gl/dist/maplibre-gl.css";
 interface Props {
   class?: string;
   initialCenter?: [number, number];
+  initialBounds?: [number, number, number, number] | null;
   initialZoom?: number;
   pmtilesUrl?: string;
   listingsApiUrl?: string;
+  enableDrawToSearch?: boolean;
 }
 
 const {
   class: className,
   initialCenter = [19.1451, 51.9194],
+  initialBounds = null,
   initialZoom = 6,
   pmtilesUrl = "https://pub-bfaa61c41d364f489c3ef9b268baf004.r2.dev/poland.pmtiles",
   listingsApiUrl = "/api/listings",
+  enableDrawToSearch = false,
 } = Astro.props;
 ---
 
@@ -22,13 +26,45 @@ const {
   class:list={["listing-map", className]}
   data-listing-map
   data-initial-center={JSON.stringify(initialCenter)}
+  data-initial-bounds={initialBounds ? JSON.stringify(initialBounds) : undefined}
   data-initial-zoom={String(initialZoom)}
   data-pmtiles-url={pmtilesUrl}
   data-listings-api-url={listingsApiUrl}
+  data-enable-draw-to-search={enableDrawToSearch ? "true" : "false"}
   data-status="idle"
 >
   <section class="listing-map__map-pane">
     <div class="listing-map__canvas" data-listing-map-canvas></div>
+    {
+      enableDrawToSearch && (
+        <>
+          <div class="listing-map__controls" data-listing-map-controls>
+            <button
+              type="button"
+              class="listing-map__control-button"
+              data-draw-toggle
+              aria-pressed="false"
+            >
+              Rysuj obszar
+            </button>
+            <button
+              type="button"
+              class="listing-map__control-button"
+              data-clear-drawing
+              disabled
+            >
+              Wyczyść obszar
+            </button>
+          </div>
+          <div
+            class="listing-map__drawing-overlay"
+            data-listing-map-drawing-overlay
+            hidden
+            aria-hidden="true"
+          ></div>
+        </>
+      )
+    }
     <div class="listing-map__status" data-listing-map-status hidden></div>
   </section>
 
@@ -193,6 +229,63 @@ const {
     padding: 0.7rem 0.95rem;
     backdrop-filter: blur(10px);
     box-shadow: 0 14px 30px rgb(73 57 37 / 0.14);
+  }
+
+  .listing-map__controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 3;
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: min(26rem, calc(100% - 2rem));
+  }
+
+  .listing-map__control-button {
+    border: 1px solid rgb(128 112 115 / 0.14);
+    border-radius: 999px;
+    background: rgb(255 250 244 / 0.97);
+    color: #2d251d;
+    font: 600 0.85rem/1 "Geist Variable", sans-serif;
+    padding: 0.78rem 1rem;
+    box-shadow: 0 12px 28px rgb(50 39 41 / 0.12);
+    transition:
+      transform 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .listing-map__control-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgb(255 247 238);
+  }
+
+  .listing-map__control-button:focus-visible {
+    outline: 3px solid rgb(138 119 96 / 0.26);
+    outline-offset: 2px;
+  }
+
+  .listing-map__control-button[data-active="true"] {
+    border-color: rgb(91 74 46 / 0.24);
+    background: #201913;
+    color: #fffaf4;
+  }
+
+  .listing-map__control-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+    transform: none;
+  }
+
+  .listing-map__drawing-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    cursor: crosshair;
+    touch-action: none;
   }
 
   .listing-map :global(.listing-map__card) {

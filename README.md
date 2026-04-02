@@ -87,6 +87,7 @@ Design-to-code dla auth jest opisany w:
 SITE_URL=http://localhost:4321
 PUBLIC_API_BASE_URL=http://localhost:3000
 API_SERVER_BASE_URL=http://localhost:3000
+GEOCODER_BASE_URL=http://localhost:2322
 ```
 
 ### `apps/server-axum/.env`
@@ -115,4 +116,14 @@ Repo ma minimalny workflow GitHub Actions w `.github/workflows/ci.yml`, który:
 
 ## Compose
 
-`compose.yaml` w tym repo uruchamia konsolę Autobase. Nie zastępuje bazy aplikacyjnej dla `server-axum`, więc testy i migracje nadal wymagają działającego Postgresa pod `DATABASE_URL`.
+`compose.yaml` w tym repo uruchamia konsolę Autobase oraz opcjonalny geokoder Photon pod profilem `geocoder`. Nie zastępuje bazy aplikacyjnej dla `server-axum`, więc testy i migracje nadal wymagają działającego Postgresa pod `DATABASE_URL`.
+
+Photon nie startuje przy zwykłym `docker compose up`. Aby uruchomić tylko geokoder lokalnie:
+
+```sh
+docker compose --profile geocoder up -d photon
+```
+
+Lokalny endpoint Photon będzie dostępny pod `http://localhost:2322`.
+
+Praktyczna uwaga: `REGION=europe` oznacza duży indeks danych. Pierwszy start może pobierać i rozpakowywać dane przez długi czas oraz wymagać dziesiątek GB wolnego miejsca na dysku.

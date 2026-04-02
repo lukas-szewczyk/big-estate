@@ -14,6 +14,9 @@ export default defineConfig({
   vite: {
     // Astro and @tailwindcss/vite currently resolve different Vite type packages here.
     plugins: [/** @type {any} */ (tailwindcss())],
+    optimizeDeps: {
+      include: ["maplibre-gl", "@protomaps/basemaps", "pmtiles"],
+    },
   },
   adapter: cloudflare({
     platformProxy: {

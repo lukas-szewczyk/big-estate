@@ -2,6 +2,7 @@
 export const prerender = false;
 
 import BaseHead from "../components/BaseHead.astro";
+import "../styles/location-search.css";
 ---
 
 <!doctype html>
@@ -62,6 +63,15 @@ import BaseHead from "../components/BaseHead.astro";
               value=""
               disabled
               data-category-input
+            />
+            <input type="hidden" name="location_lat" value="" disabled data-location-lat-input />
+            <input type="hidden" name="location_lon" value="" disabled data-location-lon-input />
+            <input
+              type="hidden"
+              name="location_bbox"
+              value=""
+              disabled
+              data-location-bbox-input
             />
 
             <div class="overflow-hidden rounded-[2rem] border border-black/10 bg-white/74 shadow-[0_26px_90px_rgba(40,31,20,0.1)] backdrop-blur-xl">
@@ -149,7 +159,11 @@ import BaseHead from "../components/BaseHead.astro";
                       </svg>
                     </div>
 
-                    <label class="flex min-w-0 flex-1 flex-col gap-1.5" for="homepage-location">
+                    <label
+                      class="flex min-w-0 flex-1 flex-col gap-1.5"
+                      for="homepage-location"
+                      data-location-field
+                    >
                       <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
                         Lokalizacja
                       </span>
@@ -161,6 +175,7 @@ import BaseHead from "../components/BaseHead.astro";
                         autocomplete="off"
                         placeholder="Miasto, dzielnica, okolica"
                         class="w-full border-0 bg-transparent p-0 font-secondary text-[1.16rem] font-medium tracking-[-0.03em] text-[#17130f] outline-none placeholder:text-[#938676] sm:text-[1.55rem]"
+                        data-location-input
                       />
                     </label>
                   </div>
@@ -247,137 +262,10 @@ import BaseHead from "../components/BaseHead.astro";
       </section>
     </main>
 
-    <script is:inline>
-      const moduleRoot = document.querySelector("[data-search-module]");
+    <script>
+      import { startSearchModuleLifecycle } from "../scripts/search-form";
 
-      if (moduleRoot instanceof HTMLFormElement) {
-        const transactionInput = moduleRoot.querySelector("[data-transaction-input]");
-        const categoryInput = moduleRoot.querySelector("[data-category-input]");
-        const propertyTypeSelect = moduleRoot.querySelector(
-          "[data-property-type-select]",
-        );
-        const toggles = Array.from(
-          moduleRoot.querySelectorAll("[data-transaction-toggle]"),
-        );
-        const priceInputs = Array.from(
-          moduleRoot.querySelectorAll("[data-price-input]"),
-        );
-        const placeholderPresets = {
-          sale: {
-            min: "np. 450 000",
-            max: "np. 1 250 000",
-          },
-          rent: {
-            min: "np. 2 000",
-            max: "np. 6 500",
-          },
-        };
-        const categoryMap = {
-          apartment: "1",
-          house: "2",
-          plot: "3",
-          room: "",
-          "": "",
-        };
-
-        const formatPriceValue = (value) => {
-          const digits = value.replace(/\D+/g, "");
-
-          if (!digits) {
-            return "";
-          }
-
-          return new Intl.NumberFormat("pl-PL").format(Number(digits));
-        };
-
-        const sanitizePriceValue = (value) => value.replace(/\D+/g, "");
-
-        const syncCategoryInput = () => {
-          if (
-            !(categoryInput instanceof HTMLInputElement) ||
-            !(propertyTypeSelect instanceof HTMLSelectElement)
-          ) {
-            return;
-          }
-
-          const categoryId = categoryMap[propertyTypeSelect.value] ?? "";
-          categoryInput.value = categoryId;
-          categoryInput.disabled = categoryId === "";
-        };
-
-        const setTransaction = (value) => {
-          if (!(transactionInput instanceof HTMLInputElement)) {
-            return;
-          }
-
-          transactionInput.value = value;
-
-          toggles.forEach((toggle) => {
-            if (!(toggle instanceof HTMLButtonElement)) {
-              return;
-            }
-
-            const isActive = toggle.dataset.value === value;
-            toggle.dataset.active = isActive ? "true" : "false";
-            toggle.setAttribute("aria-pressed", String(isActive));
-          });
-
-          priceInputs.forEach((input) => {
-            if (!(input instanceof HTMLInputElement)) {
-              return;
-            }
-
-            const kind = input.dataset.priceKind;
-            if (kind !== "min" && kind !== "max") {
-              return;
-            }
-
-            input.placeholder = placeholderPresets[value]?.[kind] ?? input.placeholder;
-          });
-        };
-
-        toggles.forEach((toggle) => {
-          if (!(toggle instanceof HTMLButtonElement)) {
-            return;
-          }
-
-          toggle.addEventListener("click", () => {
-            const value = toggle.dataset.value;
-            if (!value) {
-              return;
-            }
-
-            setTransaction(value);
-          });
-        });
-
-        if (propertyTypeSelect instanceof HTMLSelectElement) {
-          propertyTypeSelect.addEventListener("change", syncCategoryInput);
-          syncCategoryInput();
-        }
-
-        priceInputs.forEach((input) => {
-          if (!(input instanceof HTMLInputElement)) {
-            return;
-          }
-
-          input.addEventListener("input", () => {
-            input.value = formatPriceValue(input.value);
-          });
-
-          input.addEventListener("blur", () => {
-            input.value = formatPriceValue(input.value);
-          });
-        });
-
-        moduleRoot.addEventListener("submit", () => {
-          priceInputs.forEach((input) => {
-            if (input instanceof HTMLInputElement) {
-              input.value = sanitizePriceValue(input.value);
-            }
-          });
-        });
-      }
+      startSearchModuleLifecycle();
     </script>
 
     <style>

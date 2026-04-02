@@ -3,6 +3,26 @@ export const prerender = false;
 
 import BaseHead from "../components/BaseHead.astro";
 import ListingMap from "../components/map/ListingMap.astro";
+import {
+  parseBbox,
+  searchLocationSuggestions,
+} from "../lib/geocoding";
+import "../styles/location-search.css";
+
+function readBooleanFlag(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    ["1", "true", "yes", "on"].includes(value.trim().toLowerCase())
+  );
+}
+
+function resolveBooleanFlag(primary: unknown, fallback: unknown): boolean {
+  if (typeof primary === "string" && primary.trim().length > 0) {
+    return readBooleanFlag(primary);
+  }
+
+  return readBooleanFlag(fallback);
+}
 
 function sanitizeTransactionType(raw: string | null): "sale" | "rent" {
   return raw === "rent" ? "rent" : "sale";
@@ -69,6 +89,23 @@ function formatDisplayPrice(raw: string | null): string {
   return new Intl.NumberFormat("pl-PL").format(Number(digits));
 }
 
+function parseCoordinate(
+  raw: string | null,
+  min: number,
+  max: number,
+): number | null {
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < min || value > max) {
+    return null;
+  }
+
+  return value;
+}
+
 const searchParams = Astro.url.searchParams;
 const transactionType = sanitizeTransactionType(
   searchParams.get("transaction_type"),
@@ -77,7 +114,7 @@ const propertyType =
   sanitizePropertyType(searchParams.get("property_type")) ||
   propertyTypeFromCategoryId(searchParams.get("category_id"));
 const categoryId = categoryIdForPropertyType(propertyType);
-const location = searchParams.get("location") ?? "";
+const requestedLocation = searchParams.get("location") ?? "";
 const minPrice = formatDisplayPrice(searchParams.get("min_price"));
 const maxPrice = formatDisplayPrice(searchParams.get("max_price"));
 const rooms = searchParams.get("rooms") ?? "";
@@ -85,6 +122,51 @@ const pricePlaceholders =
   transactionType === "rent"
     ? { min: "np. 2 000", max: "np. 6 500" }
     : { min: "np. 450 000", max: "np. 1 250 000" };
+let selectedLocationLabel = requestedLocation;
+let selectedLocationLat = parseCoordinate(searchParams.get("location_lat"), -90, 90);
+let selectedLocationLon = parseCoordinate(searchParams.get("location_lon"), -180, 180);
+let selectedLocationBbox = parseBbox(searchParams.get("location_bbox"));
+
+if (
+  requestedLocation &&
+  (selectedLocationLat === null ||
+    selectedLocationLon === null ||
+    selectedLocationBbox === null)
+) {
+  try {
+    const [suggestion] = await searchLocationSuggestions(requestedLocation, {
+      locals: Astro.locals,
+      limit: 1,
+    });
+
+    if (suggestion) {
+      selectedLocationLabel = suggestion.label;
+      selectedLocationLat = suggestion.lat;
+      selectedLocationLon = suggestion.lon;
+      selectedLocationBbox = parseBbox(suggestion.bbox);
+    }
+  } catch (error) {
+    console.error("Failed to geocode listing location on the server", error);
+  }
+}
+
+const mapInitialCenter: [number, number] =
+  selectedLocationLat !== null && selectedLocationLon !== null
+    ? [selectedLocationLon, selectedLocationLat]
+    : [19.1451, 51.9194];
+const mapInitialZoom =
+  selectedLocationLat !== null && selectedLocationLon !== null ? 11 : 6;
+const serializedLocationLat =
+  selectedLocationLat !== null ? String(selectedLocationLat) : "";
+const serializedLocationLon =
+  selectedLocationLon !== null ? String(selectedLocationLon) : "";
+const serializedLocationBbox = selectedLocationBbox
+  ? selectedLocationBbox.join(",")
+  : "";
+const drawToSearchEnabled = resolveBooleanFlag(
+  Astro.locals.runtime?.env?.PUBLIC_ENABLE_DRAW_TO_SEARCH,
+  import.meta.env.PUBLIC_ENABLE_DRAW_TO_SEARCH,
+);
 ---
 
 <!doctype html>
@@ -133,6 +215,27 @@ const pricePlaceholders =
               value={categoryId}
               disabled={categoryId === ""}
               data-category-input
+            />
+            <input
+              type="hidden"
+              name="location_lat"
+              value={serializedLocationLat}
+              disabled={serializedLocationLat === ""}
+              data-location-lat-input
+            />
+            <input
+              type="hidden"
+              name="location_lon"
+              value={serializedLocationLon}
+              disabled={serializedLocationLon === ""}
+              data-location-lon-input
+            />
+            <input
+              type="hidden"
+              name="location_bbox"
+              value={serializedLocationBbox}
+              disabled={serializedLocationBbox === ""}
+              data-location-bbox-input
             />
 
             <button
@@ -194,17 +297,22 @@ const pricePlaceholders =
               </span>
             </button>
 
-            <label class="listing-toolbar-field border-l border-black/8 px-5" for="listing-location">
+            <label
+              class="listing-toolbar-field border-l border-black/8 px-5"
+              for="listing-location"
+              data-location-field
+            >
               <span class="listing-toolbar-label">Lokalizacja</span>
               <input
                 id="listing-location"
                 name="location"
                 type="text"
-                value={location}
+                value={selectedLocationLabel}
                 enterkeyhint="search"
                 autocomplete="off"
                 placeholder="Miasto, dzielnica, okolica"
                 class="listing-toolbar-input"
+                data-location-input
               />
             </label>
 
@@ -295,142 +403,21 @@ const pricePlaceholders =
 
       <section class="relative z-10 flex-1 min-h-0">
         <div class="h-full min-h-0 w-full overflow-hidden border-t border-black/8 bg-white/40 backdrop-blur-sm">
-          <ListingMap class="h-full min-h-full" />
+          <ListingMap
+            class="h-full min-h-full"
+            initialCenter={mapInitialCenter}
+            initialBounds={selectedLocationBbox}
+            initialZoom={mapInitialZoom}
+            enableDrawToSearch={drawToSearchEnabled}
+          />
         </div>
       </section>
     </main>
 
-    <script is:inline>
-      const moduleRoot = document.querySelector("[data-search-module]");
+    <script>
+      import { startSearchModuleLifecycle } from "../scripts/search-form";
 
-      if (moduleRoot instanceof HTMLFormElement) {
-        const transactionInput = moduleRoot.querySelector("[data-transaction-input]");
-        const categoryInput = moduleRoot.querySelector("[data-category-input]");
-        const propertyTypeSelect = moduleRoot.querySelector(
-          "[data-property-type-select]",
-        );
-        const toggles = Array.from(
-          moduleRoot.querySelectorAll("[data-transaction-toggle]"),
-        );
-        const priceInputs = Array.from(
-          moduleRoot.querySelectorAll("[data-price-input]"),
-        );
-        const placeholderPresets = {
-          sale: {
-            min: "np. 450 000",
-            max: "np. 1 250 000",
-          },
-          rent: {
-            min: "np. 2 000",
-            max: "np. 6 500",
-          },
-        };
-        const categoryMap = {
-          apartment: "1",
-          house: "2",
-          plot: "3",
-          room: "",
-          "": "",
-        };
-
-        const formatPriceValue = (value) => {
-          const digits = value.replace(/\D+/g, "");
-
-          if (!digits) {
-            return "";
-          }
-
-          return new Intl.NumberFormat("pl-PL").format(Number(digits));
-        };
-
-        const sanitizePriceValue = (value) => value.replace(/\D+/g, "");
-
-        const setTransaction = (value) => {
-          if (!(transactionInput instanceof HTMLInputElement)) {
-            return;
-          }
-
-          transactionInput.value = value;
-
-          toggles.forEach((toggle) => {
-            if (!(toggle instanceof HTMLButtonElement)) {
-              return;
-            }
-
-            const isActive = toggle.dataset.value === value;
-            toggle.dataset.active = isActive ? "true" : "false";
-            toggle.setAttribute("aria-pressed", String(isActive));
-          });
-
-          priceInputs.forEach((input) => {
-            if (!(input instanceof HTMLInputElement)) {
-              return;
-            }
-
-            const kind = input.dataset.priceKind;
-            if (kind !== "min" && kind !== "max") {
-              return;
-            }
-
-            input.placeholder = placeholderPresets[value]?.[kind] ?? input.placeholder;
-          });
-        };
-
-        const syncCategoryInput = () => {
-          if (
-            !(categoryInput instanceof HTMLInputElement) ||
-            !(propertyTypeSelect instanceof HTMLSelectElement)
-          ) {
-            return;
-          }
-
-          const categoryId = categoryMap[propertyTypeSelect.value] ?? "";
-          categoryInput.value = categoryId;
-          categoryInput.disabled = categoryId === "";
-        };
-
-        toggles.forEach((toggle) => {
-          if (!(toggle instanceof HTMLButtonElement)) {
-            return;
-          }
-
-          toggle.addEventListener("click", () => {
-            const value = toggle.dataset.value;
-            if (!value) {
-              return;
-            }
-
-            setTransaction(value);
-          });
-        });
-
-        if (propertyTypeSelect instanceof HTMLSelectElement) {
-          propertyTypeSelect.addEventListener("change", syncCategoryInput);
-          syncCategoryInput();
-        }
-
-        priceInputs.forEach((input) => {
-          if (!(input instanceof HTMLInputElement)) {
-            return;
-          }
-
-          input.addEventListener("input", () => {
-            input.value = formatPriceValue(input.value);
-          });
-
-          input.addEventListener("blur", () => {
-            input.value = formatPriceValue(input.value);
-          });
-        });
-
-        moduleRoot.addEventListener("submit", () => {
-          priceInputs.forEach((input) => {
-            if (input instanceof HTMLInputElement) {
-              input.value = sanitizePriceValue(input.value);
-            }
-          });
-        });
-      }
+      startSearchModuleLifecycle();
     </script>
 
     <style>
