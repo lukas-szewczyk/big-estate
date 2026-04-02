@@ -80,21 +80,12 @@ export const GET: APIRoute = async ({ locals, url }) => {
             c.name AS category_name,
             city.name AS city_name,
             loc.street,
-            loc.coordinates::geometry AS geometry,
-            COALESCE(primary_media.url, '/listing-placeholder.svg') AS thumbnail_url
+            loc.coordinates::geometry AS geometry
           FROM listings AS l
           INNER JOIN properties AS p ON p.id = l.property_id
           INNER JOIN categories AS c ON c.id = p.category_id
           INNER JOIN locations AS loc ON loc.id = p.location_id
           INNER JOIN cities AS city ON city.id = loc.city_id
-          LEFT JOIN LATERAL (
-            SELECT url
-            FROM media
-            WHERE listing_id = l.id
-              AND media_type = 'photo'
-            ORDER BY is_main DESC, sort_order ASC, id ASC
-            LIMIT 1
-          ) AS primary_media ON TRUE
           WHERE l.status = 'active'
             AND ST_Intersects(
               loc.coordinates::geometry,
@@ -129,7 +120,7 @@ export const GET: APIRoute = async ({ locals, url }) => {
                   'transactionType',
                   transaction_type,
                   'thumbnailUrl',
-                  thumbnail_url,
+                  '/listing-placeholder.svg',
                   'city',
                   city_name,
                   'street',

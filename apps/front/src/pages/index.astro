@@ -2,7 +2,6 @@
 export const prerender = false;
 
 import BaseHead from "../components/BaseHead.astro";
-import ListingMap from "../components/map/ListingMap.astro";
 ---
 
 <!doctype html>
@@ -15,33 +14,6 @@ import ListingMap from "../components/map/ListingMap.astro";
     />
   </head>
   <body class="h-full bg-background text-foreground">
-    <main class="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,#fffaf2_0%,rgba(255,250,242,0.92)_20%,rgba(245,237,229,0.95)_55%,#efe4d8_100%)]">
-      <header class="border-b border-black/5 bg-white/70 px-5 py-4 backdrop-blur md:px-8">
-        <div class="mx-auto flex max-w-7xl flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div class="space-y-2">
-            <p class="font-primary text-[11px] uppercase tracking-[0.18em] text-[#8b5b63]">
-              Map & List Explorer
-            </p>
-            <h1 class="font-secondary text-2xl font-semibold text-[#20181a] md:text-[2.2rem]">
-              Discover active homes without leaving the map
-            </h1>
-            <p class="max-w-3xl font-secondary text-sm leading-6 text-[#64575a]">
-              Pan across Poland to refresh live mock inventory, compare homes in the
-              list, and jump straight to the property that catches your eye.
-            </p>
-          </div>
 
-          <div class="rounded-full border border-[#d9c3bf] bg-white/85 px-4 py-2 font-secondary text-xs text-[#6b5a5d] shadow-[0_10px_30px_rgba(72,45,49,0.08)]">
-            Viewport-driven search powered by Astro, MapLibre, and PostGIS
-          </div>
-        </div>
-      </header>
-
-      <section class="flex-1 p-4 md:p-6">
-        <div class="mx-auto h-[calc(100vh-9.5rem)] max-w-7xl overflow-hidden rounded-[1.75rem] border border-black/8 bg-white shadow-[0_24px_80px_rgba(45,31,34,0.12)]">
-          <ListingMap class="min-h-full" />
-        </div>
-      </section>
-    </main>
   </body>
 </html>
