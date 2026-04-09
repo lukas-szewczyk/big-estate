@@ -1,3 +1,5 @@
+Never, ever, under any circumstances, ever, not once, no matter what, try to start the dev server, it’s already fucking running.
+
 # Project instructions
 
 This repository is a Turborepo monorepo for a real-estate marketplace.

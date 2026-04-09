@@ -1,7 +1,13 @@
+export type PlatformRole = "admin" | "user";
+export type BusinessRole = "buyer" | "agent" | "developer" | "owner";
+
 export type SessionUser = {
   id: number;
   email: string;
-  role: "admin" | "user";
+  role: PlatformRole;
+  business_role: BusinessRole;
+  agency_id: number | null;
+  is_verified: boolean;
 };
 
 type RuntimeEnv = {

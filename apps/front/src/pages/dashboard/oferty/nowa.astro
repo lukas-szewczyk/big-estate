@@ -1,0 +1,56 @@
+---
+export const prerender = false;
+
+import BaseHead from "../../../components/BaseHead.astro";
+import SellerShell from "../../../components/dashboard/SellerShell.astro";
+import { SellerListingWizard } from "../../../components/dashboard/SellerListingWizard";
+import { getPublicApiBaseUrl, getSessionUser } from "../../../lib/auth";
+import {
+  fetchAmenities,
+  fetchCategories,
+  fetchProfile,
+  fetchVoivodeships,
+} from "../../../lib/server/seller";
+
+const user = await getSessionUser(Astro.request, Astro.locals);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const [profile, voivodeships, categories, amenities] = await Promise.all([
+  fetchProfile(Astro.request, Astro.locals),
+  fetchVoivodeships(Astro.request, Astro.locals),
+  fetchCategories(Astro.request, Astro.locals),
+  fetchAmenities(Astro.request, Astro.locals),
+]);
+
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
+---
+
+<!doctype html>
+<html lang="pl" class="h-full bg-background">
+  <head>
+    <BaseHead
+      title="Nowa oferta"
+      description="Przejdź przez pełny kreator wystawienia nieruchomości: profil, obiekt, szkic, media i publikacja."
+      image="/listing-placeholder.svg"
+    />
+  </head>
+  <body class="min-h-full">
+    <SellerShell
+      currentPath={Astro.url.pathname}
+      user={user}
+      title="Wystaw nieruchomość"
+      description="Pełny flow sprzedażowy w jednym miejscu: od ustawienia roli po publikację aktywnej oferty."
+    >
+      <SellerListingWizard
+        apiBaseUrl={apiBaseUrl}
+        client:load
+        initialAmenities={amenities}
+        initialCategories={categories}
+        initialProfile={profile}
+        initialVoivodeships={voivodeships}
+      />
+    </SellerShell>
+  </body>
+</html>

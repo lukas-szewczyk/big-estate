@@ -1,0 +1,145 @@
+---
+export const prerender = false;
+
+import BaseHead from "../../components/BaseHead.astro";
+import SellerShell from "../../components/dashboard/SellerShell.astro";
+import StatCard from "../../components/dashboard/StatCard.astro";
+import ListingsTable from "../../components/dashboard/ListingsTable.astro";
+import { getSessionUser } from "../../lib/auth";
+import { fetchDashboardData } from "../../lib/server/seller";
+
+const user = await getSessionUser(Astro.request, Astro.locals);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const dashboard = await fetchDashboardData(Astro.request, Astro.locals);
+---
+
+<!doctype html>
+<html lang="pl" class="h-full bg-background">
+  <head>
+    <BaseHead
+      title="Dashboard sprzedającego"
+      description="Monitoruj przygotowanie oferty, rozmowy z kupującymi i aktywność swoich ogłoszeń."
+      image="/listing-placeholder.svg"
+    />
+  </head>
+  <body class="min-h-full">
+    <SellerShell
+      currentPath={Astro.url.pathname}
+      user={user}
+      title="Dashboard wystawiającego"
+      description="Jeden widok do przygotowania nieruchomości, publikacji oferty i kontroli rozmów z kupującymi."
+      actionHref="/dashboard/oferty/nowa"
+      actionLabel="Nowa oferta"
+    >
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Szkice" value={dashboard.summary.draftCount} hint="Oferty zapisane, ale jeszcze nieopublikowane." />
+        <StatCard label="Aktywne" value={dashboard.summary.activeCount} hint="Widoczne ogłoszenia gotowe na nowych kupujących." />
+        <StatCard label="Sprzedane" value={dashboard.summary.soldCount} hint="Domknięte oferty zakończone sukcesem." />
+        <StatCard label="Wygasłe" value={dashboard.summary.expiredCount} hint="Ogłoszenia wymagające odświeżenia lub poprawki." />
+        <StatCard label="Rozmowy" value={dashboard.summary.conversationCount} hint="Aktywne wątki kontaktowe powiązane z ofertami." />
+        <StatCard label="Open house" value={dashboard.summary.upcomingOpenHouseCount} hint="Zaplanowane wizyty i dni otwarte przed nami." />
+      </section>
+
+      <section class="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div class="rounded-[2rem] border border-black/8 bg-white/86 px-5 py-5 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Gotowość publikacji</p>
+              <h2 class="mt-2 font-secondary text-xl font-semibold text-[#19150f]">Checklist startowa</h2>
+            </div>
+            <a href="/dashboard/oferty/nowa" class="font-secondary text-sm text-[#1d1711] underline decoration-black/20 underline-offset-4">
+              Otwórz kreator
+            </a>
+          </div>
+
+          <div class="mt-5 space-y-3">
+            {dashboard.checklist.map((item) => (
+              <div class="flex gap-4 rounded-[1.4rem] border border-black/7 bg-[#fbf8f4] px-4 py-4">
+                <div class:list={[
+                  "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-primary text-[0.7rem]",
+                  item.complete ? "bg-[#ddefdf] text-[#2f6e45]" : "bg-[#f1e4d5] text-[#8b5a2b]",
+                ]}>
+                  {item.complete ? "OK" : "GO"}
+                </div>
+                <div>
+                  <p class="font-secondary text-sm font-semibold text-[#1d1711]">{item.label}</p>
+                  <p class="mt-1 font-secondary text-sm text-[#665a4e]">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div class="space-y-6">
+          <div class="rounded-[2rem] border border-black/8 bg-white/86 px-5 py-5 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+            <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Ostatnie rozmowy</p>
+            <h2 class="mt-2 font-secondary text-xl font-semibold text-[#19150f]">Kontakt z kupującymi</h2>
+            <div class="mt-5 space-y-3">
+              {dashboard.recentConversations.length === 0 ? (
+                <p class="font-secondary text-sm text-[#665a4e]">Gdy ktoś napisze w sprawie oferty, rozmowa pojawi się tutaj.</p>
+              ) : (
+                dashboard.recentConversations.map((conversation) => (
+                  <div class="rounded-[1.4rem] border border-black/7 bg-[#fbf8f4] px-4 py-4">
+                    <div class="flex items-center justify-between gap-4">
+                      <p class="font-secondary text-sm font-semibold text-[#1d1711]">{conversation.participant_user_email}</p>
+                      <span class="font-primary text-[0.62rem] uppercase tracking-[0.18em] text-[#8a7760]">
+                        {new Date(conversation.updated_at).toLocaleDateString("pl-PL")}
+                      </span>
+                    </div>
+                    <p class="mt-2 font-secondary text-sm text-[#665a4e]">{conversation.last_message_preview}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div class="rounded-[2rem] border border-black/8 bg-white/86 px-5 py-5 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+            <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Najbliższe wydarzenia</p>
+            <h2 class="mt-2 font-secondary text-xl font-semibold text-[#19150f]">Dni otwarte</h2>
+            <div class="mt-5 space-y-3">
+              {dashboard.upcomingOpenHouses.length === 0 ? (
+                <p class="font-secondary text-sm text-[#665a4e]">Dodaj open house w kreatorze, aby planować wizyty i budować zainteresowanie.</p>
+              ) : (
+                dashboard.upcomingOpenHouses.map((openHouse) => (
+                  <div class="rounded-[1.4rem] border border-black/7 bg-[#fbf8f4] px-4 py-4">
+                    <p class="font-secondary text-sm font-semibold text-[#1d1711]">
+                      {openHouse.city}, {openHouse.street}
+                    </p>
+                    <p class="mt-1 font-secondary text-sm text-[#665a4e]">
+                      {new Date(openHouse.start_time).toLocaleString("pl-PL")}
+                      {" - "}
+                      {new Date(openHouse.end_time).toLocaleTimeString("pl-PL", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                    {openHouse.instructions && (
+                      <p class="mt-2 font-secondary text-xs text-[#7a6d5d]">{openHouse.instructions}</p>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-6">
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Portfolio ofert</p>
+            <h2 class="mt-2 font-secondary text-xl font-semibold text-[#19150f]">Ostatnie nieruchomości</h2>
+          </div>
+          <a href="/dashboard/oferty" class="font-secondary text-sm text-[#1d1711] underline decoration-black/20 underline-offset-4">
+            Zobacz wszystkie
+          </a>
+        </div>
+
+        <ListingsTable listings={dashboard.recentListings} />
+      </section>
+    </SellerShell>
+  </body>
+</html>

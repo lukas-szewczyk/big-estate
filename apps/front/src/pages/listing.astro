@@ -7,6 +7,7 @@ import {
   parseBbox,
   searchLocationSuggestions,
 } from "../lib/geocoding";
+import { getPublicApiBaseUrl, getSessionUser } from "../lib/auth";
 import "../styles/location-search.css";
 
 function readBooleanFlag(value: unknown): boolean {
@@ -107,6 +108,10 @@ function parseCoordinate(
 }
 
 const searchParams = Astro.url.searchParams;
+const sessionUser = await getSessionUser(Astro.request, Astro.locals);
+const accountHref = sessionUser ? "/dashboard" : "/login";
+const addListingHref = sessionUser ? "/dashboard/oferty/nowa" : "/login";
+const apiBaseUrl = getPublicApiBaseUrl(Astro.locals);
 const transactionType = sanitizeTransactionType(
   searchParams.get("transaction_type"),
 );
@@ -195,6 +200,28 @@ const drawToSearchEnabled = resolveBooleanFlag(
 
       <header class="listing-toolbar-shell sticky top-0 z-20 px-3 pb-3 pt-3 sm:px-4 sm:pb-4 sm:pt-4">
         <h1 class="sr-only">Mapa ofert nieruchomości</h1>
+
+        <div class="mx-auto mb-3 flex w-full max-w-[82rem] items-center justify-end gap-3">
+          <a
+            href={addListingHref}
+            class="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-[#19150f] px-4 whitespace-nowrap font-secondary text-sm font-medium text-white shadow-[0_10px_24px_rgba(35,28,19,0.08)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#110e09]"
+          >
+            Dodaj ogłoszenie
+          </a>
+          <a
+            href={accountHref}
+            class="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white/65 px-4 whitespace-nowrap font-secondary text-sm font-medium text-[#2c261f] shadow-[0_10px_24px_rgba(35,28,19,0.05)] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+          >
+            Moje konto
+          </a>
+          <a
+            href="/wishlist"
+            class="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-black/10 bg-white/65 px-4 whitespace-nowrap font-secondary text-sm font-medium text-[#8f5f67] shadow-[0_10px_24px_rgba(35,28,19,0.05)] backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:bg-white"
+          >
+            <span aria-hidden="true">♥</span>
+            <span>Wishlista</span>
+          </a>
+        </div>
 
         <div class="overflow-x-auto pb-1">
           <form
@@ -404,6 +431,8 @@ const drawToSearchEnabled = resolveBooleanFlag(
       <section class="relative z-10 flex-1 min-h-0">
         <div class="h-full min-h-0 w-full overflow-hidden border-t border-black/8 bg-white/40 backdrop-blur-sm">
           <ListingMap
+            apiBaseUrl={apiBaseUrl}
+            isAuthenticated={sessionUser ? true : false}
             class="h-full min-h-full"
             initialCenter={mapInitialCenter}
             initialBounds={selectedLocationBbox}

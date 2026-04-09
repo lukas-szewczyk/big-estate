@@ -178,6 +178,86 @@ async fn authed_empty(method: http::Method, uri: &str, cookie: &str) -> axum::re
         .unwrap()
 }
 
+async fn create_property_for_owner(
+    cookie: &str,
+    owner_id: i64,
+    street: &str,
+    city_id: i64,
+    district_id: i64,
+    latitude: f64,
+    longitude: f64,
+) -> i64 {
+    let response = authed_json(
+        http::Method::POST,
+        "/api/v1/properties",
+        cookie,
+        serde_json::json!({
+            "location": {
+                "city_id": city_id,
+                "district_id": district_id,
+                "street": street,
+                "postal_code": "00-001",
+                "building_number": "10",
+                "apartment_number": "12",
+                "latitude": latitude,
+                "longitude": longitude
+            },
+            "category_id": 1,
+            "area_sqm": 72.5,
+            "plot_area_sqm": null,
+            "rooms": 3,
+            "floor": 4,
+            "year_built": 2018,
+            "heating_type": "district",
+            "extra_attributes": { "finish": "turnkey" },
+            "amenity_ids": [1, 2],
+            "owners": [{ "user_id": owner_id, "ownership_share": 100.0 }]
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    let payload: serde_json::Value = json_body(response).await;
+    payload["id"].as_i64().unwrap()
+}
+
+async fn create_sale_listing(
+    cookie: &str,
+    property_id: i64,
+    price: f64,
+    status: Option<&str>,
+) -> serde_json::Value {
+    let response = authed_json(
+        http::Method::POST,
+        "/api/v1/listings",
+        cookie,
+        serde_json::json!({
+            "property_id": property_id,
+            "transaction_type": "sale",
+            "price": price,
+            "status": status
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    json_body(response).await
+}
+
+async fn create_agency(cookie: &str, company_name: &str) -> serde_json::Value {
+    let response = authed_json(
+        http::Method::POST,
+        "/api/v1/agencies",
+        cookie,
+        serde_json::json!({
+            "company_name": company_name,
+            "nip": "1234567890",
+            "address": "Warszawa, Prosta 10"
+        }),
+    )
+    .await;
+    assert_eq!(response.status(), http::StatusCode::CREATED);
+    json_body(response).await
+}
+
 #[tokio::test]
 #[serial]
 async fn register_and_me_return_extended_session_user() {
@@ -207,7 +287,7 @@ async fn register_and_me_return_extended_session_user() {
 
 #[tokio::test]
 #[serial]
-async fn owner_can_create_property_listing_media_and_history() {
+async fn owner_can_create_property_save_draft_listing_add_media_and_publish() {
     let pool = test_pool().await;
     let (owner_id, owner_cookie) = create_user_with_cookie(
         &pool,
@@ -218,53 +298,22 @@ async fn owner_can_create_property_listing_media_and_history() {
     )
     .await;
 
-    let create_property = authed_json(
-        http::Method::POST,
-        "/api/v1/properties",
+    let property_id = create_property_for_owner(
         &owner_cookie,
-        serde_json::json!({
-            "location": {
-                "city_id": 101,
-                "district_id": 1001,
-                "street": "Marszalkowska",
-                "postal_code": "00-001",
-                "building_number": "10",
-                "apartment_number": "12",
-                "latitude": 52.2297,
-                "longitude": 21.0122
-            },
-            "category_id": 1,
-            "area_sqm": 72.5,
-            "plot_area_sqm": null,
-            "rooms": 3,
-            "floor": 4,
-            "year_built": 2018,
-            "heating_type": "district",
-            "extra_attributes": { "finish": "turnkey" },
-            "amenity_ids": [1, 2],
-            "owners": [{ "user_id": owner_id, "ownership_share": 100.0 }]
-        }),
+        owner_id,
+        "Marszalkowska",
+        101,
+        1001,
+        52.2297,
+        21.0122,
     )
     .await;
-    assert_eq!(create_property.status(), http::StatusCode::CREATED);
-    let property_json: serde_json::Value = json_body(create_property).await;
-    let property_id = property_json["id"].as_i64().unwrap();
 
-    let create_listing = authed_json(
-        http::Method::POST,
-        "/api/v1/listings",
-        &owner_cookie,
-        serde_json::json!({
-            "property_id": property_id,
-            "transaction_type": "sale",
-            "price": 599000.0
-        }),
-    )
-    .await;
-    assert_eq!(create_listing.status(), http::StatusCode::CREATED);
-    let listing_json: serde_json::Value = json_body(create_listing).await;
+    let listing_json =
+        create_sale_listing(&owner_cookie, property_id, 599000.0, Some("draft")).await;
     let listing_id = listing_json["id"].as_i64().unwrap();
     assert!(listing_json["slug"].as_str().unwrap().contains("apartment"));
+    assert_eq!(listing_json["status"], "draft");
 
     let add_media = authed_json(
         http::Method::POST,
@@ -285,8 +334,8 @@ async fn owner_can_create_property_listing_media_and_history() {
         &format!("/api/v1/listings/{listing_id}/open-houses"),
         &owner_cookie,
         serde_json::json!({
-            "start_time": "2026-04-01T10:00:00Z",
-            "end_time": "2026-04-01T12:00:00Z",
+            "start_time": "2099-04-01T10:00:00Z",
+            "end_time": "2099-04-01T12:00:00Z",
             "requires_registration": true,
             "instructions": "Ring the concierge"
         }),
@@ -299,7 +348,8 @@ async fn owner_can_create_property_listing_media_and_history() {
         &format!("/api/v1/listings/{listing_id}"),
         &owner_cookie,
         serde_json::json!({
-            "price": 610000.0
+            "price": 610000.0,
+            "status": "active"
         }),
     )
     .await;
@@ -308,6 +358,7 @@ async fn owner_can_create_property_listing_media_and_history() {
     assert_eq!(patched_listing["media"].as_array().unwrap().len(), 1);
     assert_eq!(patched_listing["open_houses"].as_array().unwrap().len(), 1);
     assert_eq!(patched_listing["price"], 610000.0);
+    assert_eq!(patched_listing["status"], "active");
 
     let history_row =
         sqlx::query("SELECT COUNT(*) AS total FROM property_histories WHERE property_id = $1")
@@ -317,6 +368,398 @@ async fn owner_can_create_property_listing_media_and_history() {
             .unwrap();
     let history_total: i64 = history_row.try_get("total").unwrap();
     assert_eq!(history_total, 2);
+}
+
+#[tokio::test]
+#[serial]
+async fn seller_dashboard_surfaces_owner_agent_and_buyer_states() {
+    let pool = test_pool().await;
+    let (owner_id, owner_cookie) = create_user_with_cookie(
+        &pool,
+        "dashboard-owner@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+    let (_agent_id, agent_cookie) = create_user_with_cookie(
+        &pool,
+        "dashboard-agent@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Agent,
+    )
+    .await;
+    let (_buyer_id, buyer_cookie) = create_user_with_cookie(
+        &pool,
+        "dashboard-buyer@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Buyer,
+    )
+    .await;
+
+    let create_agency = authed_json(
+        http::Method::POST,
+        "/api/v1/agencies",
+        &agent_cookie,
+        serde_json::json!({
+            "company_name": "Aurora Estates",
+            "nip": "1234567890",
+            "address": "Warszawa, Prosta 10"
+        }),
+    )
+    .await;
+    assert_eq!(create_agency.status(), http::StatusCode::CREATED);
+
+    let property_id = create_property_for_owner(
+        &owner_cookie,
+        owner_id,
+        "Koszykowa",
+        101,
+        1001,
+        52.2250,
+        21.0050,
+    )
+    .await;
+    let listing = create_sale_listing(&owner_cookie, property_id, 920000.0, Some("draft")).await;
+    let listing_id = listing["id"].as_i64().unwrap();
+
+    let add_media = authed_json(
+        http::Method::POST,
+        &format!("/api/v1/listings/{listing_id}/media"),
+        &owner_cookie,
+        serde_json::json!({
+            "media_type": "photo",
+            "url": "https://example.com/koszykowa-main.jpg",
+            "is_main": true,
+            "sort_order": 0
+        }),
+    )
+    .await;
+    assert_eq!(add_media.status(), http::StatusCode::CREATED);
+
+    let add_open_house = authed_json(
+        http::Method::POST,
+        &format!("/api/v1/listings/{listing_id}/open-houses"),
+        &owner_cookie,
+        serde_json::json!({
+            "start_time": "2099-05-01T11:00:00Z",
+            "end_time": "2099-05-01T13:00:00Z",
+            "requires_registration": false,
+            "instructions": "Lobby desk"
+        }),
+    )
+    .await;
+    assert_eq!(add_open_house.status(), http::StatusCode::CREATED);
+
+    let create_conversation = authed_json(
+        http::Method::POST,
+        "/api/v1/conversations",
+        &buyer_cookie,
+        serde_json::json!({
+            "listing_id": listing_id,
+            "participant_user_id": owner_id,
+            "initial_message": "Czy oferta jest nadal aktualna?"
+        }),
+    )
+    .await;
+    assert_eq!(create_conversation.status(), http::StatusCode::CREATED);
+
+    let owner_dashboard = authed_empty(
+        http::Method::GET,
+        "/api/v1/me/seller-dashboard",
+        &owner_cookie,
+    )
+    .await;
+    assert_eq!(owner_dashboard.status(), http::StatusCode::OK);
+    let owner_payload: serde_json::Value = json_body(owner_dashboard).await;
+    assert_eq!(owner_payload["profile"]["business_role"], "owner");
+    assert_eq!(owner_payload["summary"]["draftCount"], 1);
+    assert_eq!(owner_payload["summary"]["activeCount"], 0);
+    assert_eq!(owner_payload["summary"]["conversationCount"], 1);
+    assert_eq!(owner_payload["summary"]["upcomingOpenHouseCount"], 1);
+    assert_eq!(owner_payload["recentListings"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        owner_payload["recentConversations"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        owner_payload["upcomingOpenHouses"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(owner_payload["checklist"][3]["complete"], true);
+    assert_eq!(owner_payload["checklist"][4]["complete"], true);
+    assert_eq!(owner_payload["checklist"][5]["complete"], false);
+
+    let agent_dashboard = authed_empty(
+        http::Method::GET,
+        "/api/v1/me/seller-dashboard",
+        &agent_cookie,
+    )
+    .await;
+    assert_eq!(agent_dashboard.status(), http::StatusCode::OK);
+    let agent_payload: serde_json::Value = json_body(agent_dashboard).await;
+    assert_eq!(agent_payload["profile"]["business_role"], "agent");
+    assert_eq!(agent_payload["summary"]["draftCount"], 0);
+    assert_eq!(agent_payload["checklist"][0]["complete"], true);
+    assert_eq!(agent_payload["checklist"][2]["complete"], true);
+
+    let buyer_dashboard = authed_empty(
+        http::Method::GET,
+        "/api/v1/me/seller-dashboard",
+        &buyer_cookie,
+    )
+    .await;
+    assert_eq!(buyer_dashboard.status(), http::StatusCode::OK);
+    let buyer_payload: serde_json::Value = json_body(buyer_dashboard).await;
+    assert_eq!(buyer_payload["profile"]["business_role"], "buyer");
+    assert_eq!(buyer_payload["summary"]["draftCount"], 0);
+    assert_eq!(buyer_payload["checklist"][0]["complete"], false);
+    assert_eq!(buyer_payload["recentListings"].as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+#[serial]
+async fn my_listings_filters_by_status_and_is_private() {
+    let pool = test_pool().await;
+    let (owner_one_id, owner_one_cookie) = create_user_with_cookie(
+        &pool,
+        "private-listings-one@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+    let (owner_two_id, owner_two_cookie) = create_user_with_cookie(
+        &pool,
+        "private-listings-two@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+
+    let owner_one_property = create_property_for_owner(
+        &owner_one_cookie,
+        owner_one_id,
+        "Swietokrzyska",
+        101,
+        1001,
+        52.2340,
+        21.0090,
+    )
+    .await;
+    let draft_listing = create_sale_listing(
+        &owner_one_cookie,
+        owner_one_property,
+        510000.0,
+        Some("draft"),
+    )
+    .await;
+    let active_listing = create_sale_listing(
+        &owner_one_cookie,
+        owner_one_property,
+        520000.0,
+        Some("active"),
+    )
+    .await;
+
+    let owner_two_property = create_property_for_owner(
+        &owner_two_cookie,
+        owner_two_id,
+        "Dluga",
+        102,
+        1005,
+        50.0647,
+        19.9450,
+    )
+    .await;
+    let _other_listing = create_sale_listing(
+        &owner_two_cookie,
+        owner_two_property,
+        880000.0,
+        Some("active"),
+    )
+    .await;
+
+    let draft_response = authed_empty(
+        http::Method::GET,
+        "/api/v1/me/listings?status=draft",
+        &owner_one_cookie,
+    )
+    .await;
+    assert_eq!(draft_response.status(), http::StatusCode::OK);
+    let draft_payload: serde_json::Value = json_body(draft_response).await;
+    assert_eq!(draft_payload["total"], 1);
+    assert_eq!(draft_payload["items"].as_array().unwrap().len(), 1);
+    assert_eq!(draft_payload["items"][0]["id"], draft_listing["id"]);
+
+    let all_response =
+        authed_empty(http::Method::GET, "/api/v1/me/listings", &owner_one_cookie).await;
+    assert_eq!(all_response.status(), http::StatusCode::OK);
+    let all_payload: serde_json::Value = json_body(all_response).await;
+    assert_eq!(all_payload["total"], 2);
+    let ids = all_payload["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["id"].as_i64().unwrap())
+        .collect::<Vec<_>>();
+    assert!(ids.contains(&draft_listing["id"].as_i64().unwrap()));
+    assert!(ids.contains(&active_listing["id"].as_i64().unwrap()));
+}
+
+#[tokio::test]
+#[serial]
+async fn owner_agent_and_developer_can_manage_colored_wishlists() {
+    let pool = test_pool().await;
+    let (_, owner_cookie) = create_user_with_cookie(
+        &pool,
+        "wishlist-owner@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+    let (_, agent_cookie) = create_user_with_cookie(
+        &pool,
+        "wishlist-agent@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Agent,
+    )
+    .await;
+    let (_, developer_cookie) = create_user_with_cookie(
+        &pool,
+        "wishlist-developer@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Developer,
+    )
+    .await;
+
+    let _agency = create_agency(&agent_cookie, "Wishlist Agency").await;
+
+    for (cookie, name, color) in [
+        (&owner_cookie, "Owner shortlist", "rose"),
+        (&agent_cookie, "Agent shortlist", "teal"),
+        (&developer_cookie, "Developer shortlist", "sky"),
+    ] {
+        let response = authed_json(
+            http::Method::POST,
+            "/api/v1/wishlists",
+            cookie,
+            serde_json::json!({
+                "name": name,
+                "color": color,
+                "is_shared": false
+            }),
+        )
+        .await;
+
+        assert_eq!(response.status(), http::StatusCode::CREATED);
+        let payload: serde_json::Value = json_body(response).await;
+        assert_eq!(payload["name"], name);
+        assert_eq!(payload["color"], color);
+    }
+}
+
+#[tokio::test]
+#[serial]
+async fn wishlist_rejects_reserved_name_and_imports_guest_items() {
+    let pool = test_pool().await;
+    let (owner_id, owner_cookie) = create_user_with_cookie(
+        &pool,
+        "wishlist-import-owner@example.com",
+        "secret-password",
+        PlatformRole::User,
+        BusinessRole::Owner,
+    )
+    .await;
+
+    let property_id = create_property_for_owner(
+        &owner_cookie,
+        owner_id,
+        "Marszalkowska",
+        101,
+        1001,
+        52.2297,
+        21.0122,
+    )
+    .await;
+    let listing_one =
+        create_sale_listing(&owner_cookie, property_id, 599000.0, Some("active")).await;
+    let listing_two =
+        create_sale_listing(&owner_cookie, property_id, 625000.0, Some("draft")).await;
+
+    let create_reserved = authed_json(
+        http::Method::POST,
+        "/api/v1/wishlists",
+        &owner_cookie,
+        serde_json::json!({
+            "name": "niezalogowany",
+            "color": "amber",
+            "is_shared": false
+        }),
+    )
+    .await;
+    assert_eq!(create_reserved.status(), http::StatusCode::BAD_REQUEST);
+
+    let create_normal = authed_json(
+        http::Method::POST,
+        "/api/v1/wishlists",
+        &owner_cookie,
+        serde_json::json!({
+            "name": "Moja lista",
+            "color": "amber",
+            "is_shared": false
+        }),
+    )
+    .await;
+    assert_eq!(create_normal.status(), http::StatusCode::CREATED);
+    let normal_payload: serde_json::Value = json_body(create_normal).await;
+    let wishlist_id = normal_payload["id"].as_i64().unwrap();
+
+    let update_reserved = authed_json(
+        http::Method::PATCH,
+        &format!("/api/v1/wishlists/{wishlist_id}"),
+        &owner_cookie,
+        serde_json::json!({
+            "name": "niezalogowany"
+        }),
+    )
+    .await;
+    assert_eq!(update_reserved.status(), http::StatusCode::BAD_REQUEST);
+
+    let import_guest = authed_json(
+        http::Method::POST,
+        "/api/v1/wishlists/import-guest",
+        &owner_cookie,
+        serde_json::json!({
+            "name": "niezalogowany",
+            "color": "sand",
+            "listing_ids": [
+                listing_one["id"].as_i64().unwrap(),
+                listing_one["id"].as_i64().unwrap(),
+                listing_two["id"].as_i64().unwrap()
+            ]
+        }),
+    )
+    .await;
+    assert_eq!(import_guest.status(), http::StatusCode::CREATED);
+    let imported_payload: serde_json::Value = json_body(import_guest).await;
+    assert_eq!(imported_payload["name"], "niezalogowany");
+    assert_eq!(imported_payload["color"], "sand");
+    assert_eq!(imported_payload["items"].as_array().unwrap().len(), 2);
+    assert!(imported_payload["items"][0]["listing"]["title"].is_string());
+    assert!(imported_payload["items"][0]["listing"]["thumbnail_url"].is_string());
 }
 
 #[tokio::test]

@@ -1,0 +1,61 @@
+---
+import type { ListingResponse } from "../../lib/server/seller";
+import StatusLabel from "./StatusLabel.astro";
+
+interface Props {
+  listings: ListingResponse[];
+  emptyMessage?: string;
+}
+
+const {
+  listings,
+  emptyMessage = "Nie masz jeszcze ofert. Zacznij od utworzenia pierwszego szkicu.",
+} = Astro.props;
+
+const currency = new Intl.NumberFormat("pl-PL", {
+  style: "currency",
+  currency: "PLN",
+  maximumFractionDigits: 0,
+});
+---
+
+<div class="overflow-hidden rounded-[1.8rem] border border-black/8 bg-white/88 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+  <div class="grid grid-cols-[minmax(0,1.6fr)_0.8fr_0.7fr_0.8fr] gap-4 border-b border-black/8 px-5 py-4 font-primary text-[0.62rem] uppercase tracking-[0.24em] text-[#8a7760]">
+    <span>Oferta</span>
+    <span>Status</span>
+    <span>Cena</span>
+    <span>Aktualizacja</span>
+  </div>
+
+  {listings.length === 0 ? (
+    <div class="px-5 py-10 font-secondary text-sm text-[#6f6254]">{emptyMessage}</div>
+  ) : (
+    <div>
+      {listings.map((listing) => (
+        <div class="grid grid-cols-[minmax(0,1.6fr)_0.8fr_0.7fr_0.8fr] gap-4 border-b border-black/6 px-5 py-4 last:border-b-0">
+          <div>
+            <p class="font-secondary text-sm font-semibold text-[#1d1711]">
+              {listing.property.category_name} w {listing.property.location.city_name}
+            </p>
+            <p class="mt-1 font-secondary text-xs text-[#6f6254]">
+              {listing.property.location.street} {listing.property.location.building_number}
+              {" · "}
+              {listing.property.area_sqm} m²
+              {" · "}
+              {listing.property.rooms} pokoje
+            </p>
+          </div>
+          <div class="flex items-center">
+            <StatusLabel status={listing.status} />
+          </div>
+          <div class="flex items-center font-secondary text-sm text-[#2b241d]">
+            {currency.format(listing.price)}
+          </div>
+          <div class="flex items-center font-secondary text-xs text-[#6f6254]">
+            {new Date(listing.updated_at).toLocaleDateString("pl-PL")}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>

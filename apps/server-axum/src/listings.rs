@@ -72,6 +72,13 @@ pub struct ListListingsGeoJsonQuery {
     pub bbox: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ListMyListingsQuery {
+    pub status: Option<String>,
+    pub page: Option<u64>,
+    pub per_page: Option<u64>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct BoundingBox {
     min_lng: f64,
@@ -353,6 +360,64 @@ pub async fn list_listings_geojson_handler(
         type_name: "FeatureCollection",
         features,
     }))
+}
+
+pub async fn list_my_listings_handler(
+    State(state): State<AppState>,
+    auth_user: AuthenticatedUser,
+    Query(query): Query<ListMyListingsQuery>,
+) -> Result<Json<PaginatedResponse<ListingResponse>>, ApiError> {
+    let pagination = PaginationQuery {
+        page: query.page,
+        per_page: query.per_page,
+    }
+    .normalize();
+    let status = parse_optional_listing_status(query.status.as_deref())?;
+
+    let total_row = sqlx::query(
+        r#"
+        SELECT COUNT(*) AS total
+        FROM listings
+        WHERE seller_user_id = $1
+          AND ($2::text IS NULL OR status = $2)
+        "#,
+    )
+    .bind(auth_user.id)
+    .bind(status.map(|value| value.as_str()))
+    .fetch_one(&state.db)
+    .await?;
+    let total: i64 = total_row.try_get("total").map_err(ApiError::from)?;
+
+    let rows = sqlx::query(
+        r#"
+        SELECT id
+        FROM listings
+        WHERE seller_user_id = $1
+          AND ($2::text IS NULL OR status = $2)
+        ORDER BY updated_at DESC, id DESC
+        LIMIT $3 OFFSET $4
+        "#,
+    )
+    .bind(auth_user.id)
+    .bind(status.map(|value| value.as_str()))
+    .bind(pagination.limit)
+    .bind(pagination.offset)
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        let listing_id: i64 = row.try_get("id").map_err(ApiError::from)?;
+        items.push(load_listing(&state.db, listing_id).await?.ok_or_else(|| {
+            ApiError::internal("listing_load_failed", "Listing disappeared mid-request")
+        })?);
+    }
+
+    Ok(Json(PaginatedResponse::new(
+        items,
+        pagination,
+        total as u64,
+    )))
 }
 
 pub async fn create_listing_handler(

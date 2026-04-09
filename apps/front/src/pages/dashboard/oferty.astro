@@ -1,0 +1,88 @@
+---
+export const prerender = false;
+
+import BaseHead from "../../components/BaseHead.astro";
+import SellerShell from "../../components/dashboard/SellerShell.astro";
+import StatCard from "../../components/dashboard/StatCard.astro";
+import ListingsTable from "../../components/dashboard/ListingsTable.astro";
+import { getSessionUser } from "../../lib/auth";
+import { fetchDashboardData, fetchMyListings } from "../../lib/server/seller";
+
+const user = await getSessionUser(Astro.request, Astro.locals);
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const status = Astro.url.searchParams.get("status");
+const [dashboard, listings] = await Promise.all([
+  fetchDashboardData(Astro.request, Astro.locals),
+  fetchMyListings(Astro.request, Astro.locals, status),
+]);
+
+const filters = [
+  { label: "Wszystkie", value: null },
+  { label: "Szkice", value: "draft" },
+  { label: "Aktywne", value: "active" },
+  { label: "Sprzedane", value: "sold" },
+  { label: "Wygasłe", value: "expired" },
+];
+---
+
+<!doctype html>
+<html lang="pl" class="h-full bg-background">
+  <head>
+    <BaseHead
+      title="Moje oferty"
+      description="Zarządzaj wszystkimi ofertami sprzedaży, filtruj statusy i kontroluj gotowość publikacji."
+      image="/listing-placeholder.svg"
+    />
+  </head>
+  <body class="min-h-full">
+    <SellerShell
+      currentPath={Astro.url.pathname}
+      user={user}
+      title="Moje oferty"
+      description="Przeglądaj wszystkie szkice i publikacje w jednym miejscu, bez przełączania się między narzędziami."
+      actionHref="/dashboard/oferty/nowa"
+      actionLabel="Dodaj ofertę"
+    >
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Szkice" value={dashboard.summary.draftCount} hint="Pracuj nad treścią i mediami przed publikacją." />
+        <StatCard label="Aktywne" value={dashboard.summary.activeCount} hint="Oferty aktualnie widoczne dla kupujących." />
+        <StatCard label="Sprzedane" value={dashboard.summary.soldCount} hint="Zamknięte transakcje gotowe do archiwizacji." />
+        <StatCard label="Wygasłe" value={dashboard.summary.expiredCount} hint="Pozycje wymagające odświeżenia lub poprawki." />
+      </section>
+
+      <section class="mt-6 rounded-[2rem] border border-black/8 bg-white/86 px-5 py-5 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Filtry</p>
+            <h2 class="mt-2 font-secondary text-xl font-semibold text-[#19150f]">Status ogłoszenia</h2>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {filters.map((filter) => {
+              const active = (filter.value === null && !status) || filter.value === status;
+              const href = filter.value ? `/dashboard/oferty?status=${filter.value}` : "/dashboard/oferty";
+
+              return (
+                <a
+                  href={href}
+                  class:list={[
+                    "inline-flex h-10 items-center rounded-full px-4 font-secondary text-sm transition-all duration-200",
+                    active ? "bg-[#19150f] text-white" : "bg-[#f2ebe1] text-[#2a241d] hover:bg-[#e8dece]",
+                  ]}
+                >
+                  {filter.label}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <ListingsTable listings={listings.items} emptyMessage="Brak ofert dla wybranego statusu. Zmień filtr lub utwórz nową ofertę." />
+        </div>
+      </section>
+    </SellerShell>
+  </body>
+</html>

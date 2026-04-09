@@ -49,6 +49,9 @@
     "migrate": {
       "cache": false
     },
+    "seed-demo": {
+      "cache": false
+    },
     "test": {}
   }
 }

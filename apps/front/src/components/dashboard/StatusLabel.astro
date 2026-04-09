@@ -1,34 +1,32 @@
 ---
 interface Props {
-  status: "available" | "charging" | "queued";
+  status: "draft" | "active" | "sold" | "expired";
 }
 
 const { status } = Astro.props;
 
 const config = {
-  available: {
-    text: "Available",
-    bg: "var(--color-success)",
-    color: "var(--color-success-foreground)",
+  draft: {
+    text: "Szkic",
+    className: "bg-[#f3e5d7] text-[#8b5a2b]",
   },
-  charging: {
-    text: "Charging",
-    bg: "var(--secondary)",
-    color: "var(--secondary-foreground)",
+  active: {
+    text: "Aktywna",
+    className: "bg-[#ddefdf] text-[#2f6e45]",
   },
-  queued: {
-    text: "Queued",
-    bg: "var(--color-warning)",
-    color: "var(--color-warning-foreground)",
+  sold: {
+    text: "Sprzedana",
+    className: "bg-[#e4ebff] text-[#3557b7]",
   },
-};
+  expired: {
+    text: "Wygasła",
+    className: "bg-[#ece7df] text-[#625648]",
+  },
+} as const;
 
-const c = config[status];
+const item = config[status];
 ---
 
-<span
-  class="inline-flex items-center justify-center gap-1 rounded-full px-2 py-0.5 font-primary text-[10px] leading-[1.14]"
-  style={`background-color: ${c.bg}; color: ${c.color};`}
->
-  {c.text}
+<span class:list={["inline-flex items-center rounded-full px-2.5 py-1 font-primary text-[0.62rem] uppercase tracking-[0.18em]", item.className]}>
+  {item.text}
 </span>

@@ -5,6 +5,9 @@
     "bootstrap-admin": {
       "cache": false
     },
+    "seed-demo": {
+      "cache": false
+    },
     "build": {
       "outputs": ["target/release/**"]
     },

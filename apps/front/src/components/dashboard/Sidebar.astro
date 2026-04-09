@@ -1,55 +1,84 @@
 ---
-interface NavItem {
-  icon: string;
-  label: string;
-  active?: boolean;
+import type { SessionUser } from "../../lib/auth";
+
+interface Props {
+  currentPath: string;
+  user: SessionUser;
 }
 
-const navItems: NavItem[] = [
-  { icon: "explore", label: "Rover Dashboard", active: true },
-  { icon: "inventory_2", label: "Rental Fleet" },
-  { icon: "handyman", label: "Maintenance" },
-  { icon: "query_stats", label: "Diagnostics" },
-  { icon: "notifications", label: "Alerts" },
+const { currentPath, user } = Astro.props;
+const normalizedPath =
+  currentPath.length > 1 && currentPath.endsWith("/")
+    ? currentPath.slice(0, -1)
+    : currentPath;
+
+const navItems = [
+  { href: "/dashboard", label: "Przegląd" },
+  { href: "/dashboard/oferty", label: "Moje oferty" },
+  { href: "/dashboard/oferty/nowa", label: "Nowa oferta" },
 ];
+
+function businessRoleLabel(role: SessionUser["business_role"]) {
+  switch (role) {
+    case "agent":
+      return "Agent";
+    case "developer":
+      return "Deweloper";
+    case "owner":
+      return "Właściciel";
+    default:
+      return "Kupujący";
+  }
+}
 ---
 
-<aside class="flex flex-col w-[224px] h-full bg-[var(--sidebar)] border-r border-[var(--sidebar-border)]">
-  <!-- Header -->
-  <div class="flex items-center h-[76px] px-4 border-b border-[var(--sidebar-border)]">
-    <div class="flex items-center gap-2">
-      <svg class="w-4 h-4 fill-[var(--primary)]" viewBox="0 0 32 32">
-        <path d="M16 0c8.83656 0 16 7.16344 16 16 0 8.83656-7.16344 16-16 16-8.83656 0-16-7.16344-16-16 0-8.83656 7.16344-16 16-16z m1.86035 8.71777c-0.66585-1.68829-3.05485-1.68829-3.7207 0l-1.21485 3.08008c-0.20329 0.51544-0.61151 0.92366-1.12695 1.12695l-3.08008 1.21485c-1.68829 0.66585-1.68829 3.05485 0 3.7207l3.08008 1.21485c0.51544 0.20329 0.92366 0.61151 1.12695 1.12695l1.21485 3.08008c0.66585 1.68829 3.05485 1.68829 3.7207 0l1.21485-3.08008c0.20329-0.51544 0.61151-0.92366 1.12695-1.12695l3.08008-1.21485c1.68829-0.66585 1.68829-3.05485 0-3.7207l-3.08008-1.21485c-0.51544-0.20329-0.92366-0.61151-1.12695-1.12695l-1.21485-3.08008z" />
-      </svg>
-      <span class="font-primary text-[var(--primary)] text-[12px] font-bold leading-none">LUNARIS</span>
-    </div>
+<aside class="flex min-h-screen w-full max-w-[17rem] flex-col border-r border-black/10 bg-white/70 px-4 py-5 backdrop-blur-xl">
+  <a href="/" class="inline-flex items-center gap-3 px-2 py-2 text-[#1d1711]">
+    <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#19150f] font-primary text-xs text-white">
+      LU
+    </span>
+    <span>
+      <span class="block font-primary text-[0.72rem] uppercase tracking-[0.28em] text-[#8a7760]">Workspace</span>
+      <span class="block font-secondary text-base font-semibold">Seller</span>
+    </span>
+  </a>
+
+  <div class="mt-8 space-y-1">
+    {navItems.map((item) => {
+      const active =
+        normalizedPath === item.href ||
+        (item.href !== "/dashboard" && normalizedPath.startsWith(item.href));
+
+      return (
+        <a
+          href={item.href}
+          class:list={[
+            "flex items-center justify-between rounded-2xl px-3 py-3 font-secondary text-sm transition-all duration-200",
+            active
+              ? "bg-[#19150f] text-white shadow-[0_18px_30px_rgba(25,21,15,0.16)]"
+              : "text-[#3f3529] hover:bg-[#f2ebe1]",
+          ]}
+        >
+          <span>{item.label}</span>
+          {active && <span class="font-primary text-[0.62rem] uppercase tracking-[0.24em] text-white/70">LIVE</span>}
+        </a>
+      );
+    })}
   </div>
 
-  <!-- Navigation -->
-  <nav class="flex flex-col flex-1 px-3 py-4">
-    <div class="px-2 py-2">
-      <span class="font-primary text-[var(--sidebar-foreground)] text-[11px] leading-none">Operations</span>
-    </div>
-    {navItems.map((item) => (
-      <a
-        href="#"
-        class:list={[
-          "flex items-center gap-2 px-2 py-2 rounded-full text-[var(--sidebar-foreground)]",
-          item.active && "bg-[var(--sidebar-accent)]",
-        ]}
-      >
-        <span class="material-icon text-[16px] text-[var(--sidebar-foreground)]" style="font-weight: 100;">{item.icon}</span>
-        <span class="font-secondary text-[12px] leading-none">{item.label}</span>
-      </a>
-    ))}
-  </nav>
+  <div class="mt-8 rounded-[1.6rem] border border-black/8 bg-[#f6efe4] px-4 py-4">
+    <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">Rola</p>
+    <p class="mt-2 font-secondary text-sm font-semibold text-[#211a13]">{businessRoleLabel(user.business_role)}</p>
+    <p class="mt-1 font-secondary text-xs text-[#6e6255]">
+      {user.is_verified ? "Profil zweryfikowany" : "Profil oczekuje na weryfikację"}
+    </p>
+    {user.business_role === "agent" && !user.agency_id && (
+      <p class="mt-3 font-secondary text-xs text-[#7a4f1c]">Dodaj agencję, aby publikować oferty.</p>
+    )}
+  </div>
 
-  <!-- Footer -->
-  <div class="flex items-center gap-2 px-4 py-4 border-t border-[var(--sidebar-border)]">
-    <div class="flex flex-col flex-1 gap-1">
-      <span class="font-secondary text-[var(--sidebar-foreground)] text-[11px] leading-none">Joe Doe</span>
-      <span class="font-secondary text-[var(--muted-foreground)] text-[10px] leading-none">joe@acmecorp.com</span>
-    </div>
-    <span class="material-icon text-[14px] text-[var(--sidebar-foreground)]" style="font-weight: 100;">keyboard_arrow_down</span>
+  <div class="mt-auto rounded-[1.6rem] border border-black/8 bg-white px-4 py-4 shadow-[0_10px_30px_rgba(37,28,19,0.06)]">
+    <p class="font-secondary text-sm font-semibold text-[#211a13]">{user.email}</p>
+    <p class="mt-1 font-secondary text-xs text-[#7b6f62]">Panel sprzedającego nieruchomości</p>
   </div>
 </aside>

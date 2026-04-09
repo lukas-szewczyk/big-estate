@@ -1,3 +1,5 @@
+import { importGuestWishlistAfterAuth } from "../features/wishlist/auth-merge";
+
 function showError(target: HTMLElement | null, message: string) {
   if (!target) {
     return;
@@ -82,6 +84,15 @@ export function mountAuthForm() {
       });
 
       if (response.ok) {
+        const importResult = await importGuestWishlistAfterAuth(apiBaseUrl);
+        if (importResult.message) {
+          showError(errorMessage, importResult.message);
+          window.setTimeout(() => {
+            window.location.assign(successPath);
+          }, 1200);
+          return;
+        }
+
         window.location.assign(successPath);
         return;
       }

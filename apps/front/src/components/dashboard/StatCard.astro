@@ -1,18 +1,15 @@
 ---
 interface Props {
   label: string;
-  value: string;
-  description: string;
-  descriptionColor?: string;
+  value: string | number;
+  hint: string;
 }
 
-const { label, value, description, descriptionColor = "var(--muted-foreground)" } = Astro.props;
+const { label, value, hint } = Astro.props;
 ---
 
-<div class="flex flex-col flex-1 rounded-none bg-[var(--card)] border border-[var(--border)] overflow-hidden">
-  <div class="flex flex-col gap-2 p-6">
-    <span class="font-secondary text-[var(--muted-foreground)] text-[12px]">{label}</span>
-    <span class="font-primary text-[var(--card-foreground)] text-[40px] font-bold leading-none">{value}</span>
-    <span class="font-secondary text-[12px]" style={`color: ${descriptionColor}`}>{description}</span>
-  </div>
+<div class="rounded-[1.75rem] border border-black/8 bg-white/88 px-5 py-5 shadow-[0_18px_40px_rgba(42,33,23,0.06)]">
+  <p class="font-primary text-[0.64rem] uppercase tracking-[0.24em] text-[#8a7760]">{label}</p>
+  <p class="mt-4 font-primary text-[2rem] font-semibold leading-none text-[#17130f]">{value}</p>
+  <p class="mt-3 font-secondary text-sm text-[#6f6254]">{hint}</p>
 </div>

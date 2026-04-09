@@ -1,0 +1,64 @@
+---
+import type { SessionUser } from "../../lib/auth";
+import Sidebar from "./Sidebar.astro";
+
+interface Props {
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  currentPath: string;
+  user: SessionUser;
+  actionHref?: string;
+  actionLabel?: string;
+}
+
+const {
+  title,
+  eyebrow = "Seller workspace",
+  description,
+  currentPath,
+  user,
+  actionHref,
+  actionLabel,
+} = Astro.props;
+---
+
+<div class="min-h-screen bg-[#f7f3ed] text-[#171512]">
+  <div class="absolute inset-0 pointer-events-none overflow-hidden">
+    <div
+      class="absolute inset-0"
+      style="background: radial-gradient(circle at top right, rgba(199, 171, 134, 0.22) 0%, rgba(247, 243, 237, 0) 35%), linear-gradient(180deg, #f8f4ee 0%, #f3eee5 100%);"
+    ></div>
+    <div class="absolute top-[-7rem] right-[-4rem] h-56 w-56 rounded-full bg-[#dfc8aa]/25 blur-3xl"></div>
+    <div class="absolute bottom-[-8rem] left-[-4rem] h-72 w-72 rounded-full bg-[#e8dcc8]/50 blur-3xl"></div>
+  </div>
+
+  <div class="relative z-10 grid min-h-screen lg:grid-cols-[17rem_minmax(0,1fr)]">
+    <Sidebar currentPath={currentPath} user={user} />
+
+    <main class="px-5 py-5 sm:px-8 sm:py-8">
+      <header class="flex flex-col gap-5 rounded-[2rem] border border-black/8 bg-white/64 px-6 py-6 shadow-[0_20px_50px_rgba(35,28,19,0.08)] backdrop-blur-xl sm:flex-row sm:items-end sm:justify-between">
+        <div class="max-w-3xl">
+          <p class="font-primary text-[0.68rem] uppercase tracking-[0.28em] text-[#8a7760]">{eyebrow}</p>
+          <h1 class="mt-3 font-secondary text-[1.9rem] font-semibold tracking-[-0.04em] text-[#17130f] sm:text-[2.6rem]">
+            {title}
+          </h1>
+          {description && <p class="mt-3 max-w-2xl font-secondary text-sm text-[#665a4e] sm:text-base">{description}</p>}
+        </div>
+
+        {actionHref && actionLabel && (
+          <a
+            href={actionHref}
+            class="inline-flex h-11 items-center justify-center rounded-full bg-[#19150f] px-5 font-secondary text-sm font-medium text-white transition-transform duration-200 hover:-translate-y-0.5"
+          >
+            {actionLabel}
+          </a>
+        )}
+      </header>
+
+      <div class="mt-6">
+        <slot />
+      </div>
+    </main>
+  </div>
+</div>

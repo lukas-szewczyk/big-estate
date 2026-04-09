@@ -9,6 +9,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::{
     accounts, auth, config::Config, engagement, error::ApiError, geo, listings, properties,
+    seller_dashboard, wishlist,
 };
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,11 @@ pub fn build_app(state: AppState) -> Result<Router, ApiError> {
             get(accounts::get_profile_handler).patch(accounts::update_profile_handler),
         )
         .route(
+            "/me/seller-dashboard",
+            get(seller_dashboard::get_seller_dashboard_handler),
+        )
+        .route("/me/listings", get(listings::list_my_listings_handler))
+        .route(
             "/agencies",
             get(accounts::list_agencies_handler).post(accounts::create_agency_handler),
         )
@@ -100,21 +106,25 @@ pub fn build_app(state: AppState) -> Result<Router, ApiError> {
         )
         .route(
             "/wishlists",
-            get(engagement::list_wishlists_handler).post(engagement::create_wishlist_handler),
+            get(wishlist::list_wishlists_handler).post(wishlist::create_wishlist_handler),
+        )
+        .route(
+            "/wishlists/import-guest",
+            post(wishlist::import_guest_wishlist_handler),
         )
         .route(
             "/wishlists/:id",
-            get(engagement::get_wishlist_handler)
-                .patch(engagement::update_wishlist_handler)
-                .delete(engagement::delete_wishlist_handler),
+            get(wishlist::get_wishlist_handler)
+                .patch(wishlist::update_wishlist_handler)
+                .delete(wishlist::delete_wishlist_handler),
         )
         .route(
             "/wishlists/:id/items",
-            post(engagement::add_wishlist_item_handler),
+            post(wishlist::add_wishlist_item_handler),
         )
         .route(
             "/wishlists/:id/items/:item_id",
-            delete(engagement::delete_wishlist_item_handler),
+            delete(wishlist::delete_wishlist_item_handler),
         )
         .route(
             "/conversations",

@@ -10,6 +10,8 @@ pub mod listings;
 pub mod models;
 pub mod properties;
 pub mod reference_data;
+pub mod seller_dashboard;
+pub mod wishlist;
 
 pub use app::{build_app, create_state, AppState};
 pub use config::Config;

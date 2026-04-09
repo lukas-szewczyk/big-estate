@@ -13,6 +13,7 @@
     "format:check": "prettier --check \"apps/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"packages/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \"infra/**/*.{js,json,jsonc,md,mjs,ts,tsx,yaml,yml}\" \".github/workflows/**/*.{yml,yaml}\" \"*.{json,md,yaml,yml}\"",
     "lint": "turbo run lint",
     "migrate": "turbo run migrate --filter=server-axum",
+    "seed-demo": "turbo run seed-demo --filter=server-axum",
     "test": "turbo run test",
     "verify": "turbo run lint check-types test build",
     "verify:affected": "turbo run lint check-types test build --affected"

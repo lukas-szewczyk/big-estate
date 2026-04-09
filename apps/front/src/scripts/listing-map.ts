@@ -11,6 +11,35 @@ import {
   acquirePmtilesProtocol,
   releasePmtilesProtocol,
 } from "../lib/map/pmtiles-protocol";
+import {
+  addWishlistItem,
+  createWishlist,
+  emitWishlistChanged,
+  fetchWishlists as fetchWishlistsCollection,
+  GUEST_WISHLIST_STORAGE_KEY,
+  guestWishlistToWishlist,
+  guestWishlistHasListing,
+  getSavedListingIdsFromWishlists,
+  readGuestWishlist,
+  removeWishlistItem,
+  removeGuestWishlistListing,
+  upsertGuestWishlistListing,
+} from "../features/wishlist";
+import type {
+  Wishlist,
+  WishlistColor,
+} from "../features/wishlist";
+import {
+  applyWishlistStateToFeatures,
+  createWishlistPriceMarker,
+  getWishlistMarkerColors,
+  getWishlistSwatch,
+  syncWishlistButtonState,
+  toWishlistListingSummary,
+  type WishlistMapFeature,
+  type WishlistMapFeatureCollection,
+  type WishlistMapListingProperties,
+} from "../features/wishlist/map-view";
 
 const DEFAULT_CENTER: [number, number] = [19.1451, 51.9194];
 const DEFAULT_ZOOM = 6;
@@ -29,37 +58,11 @@ const PLACEHOLDER_THUMBNAIL = "/listing-placeholder.svg";
 const FOCUSED_LISTING_ZOOM = 13;
 const DRAW_SAMPLE_DISTANCE_PX = 10;
 const DRAW_MIN_AREA_PX = 600;
-const POPUP_CURRENCY = new Intl.NumberFormat("pl-PL", {
-  style: "currency",
-  currency: "PLN",
-  maximumFractionDigits: 0,
-});
+const DEFAULT_API_BASE_URL = "http://localhost:3000";
 
-type ListingProperties = {
-  id: number;
-  slug: string;
-  title: string;
-  price: number;
-  rooms: number;
-  transactionType: string;
-  thumbnailUrl: string;
-  city: string;
-  street: string;
-};
-
-type ListingFeature = {
-  type: "Feature";
-  geometry: {
-    type: "Point";
-    coordinates: [number, number];
-  };
-  properties: ListingProperties;
-};
-
-type ListingFeatureCollection = {
-  type: "FeatureCollection";
-  features: ListingFeature[];
-};
+type ListingProperties = WishlistMapListingProperties;
+type ListingFeature = WishlistMapFeature;
+type ListingFeatureCollection = WishlistMapFeatureCollection;
 
 type SearchFilters = Partial<{
   transaction_type: "sale" | "rent";
@@ -162,7 +165,9 @@ function parseZoom(value: string | undefined): number {
   return Number.isFinite(parsed) ? parsed : DEFAULT_ZOOM;
 }
 
-function parseBounds(value: string | undefined): [number, number, number, number] | null {
+function parseBounds(
+  value: string | undefined,
+): [number, number, number, number] | null {
   if (!value) {
     return null;
   }
@@ -193,7 +198,7 @@ function formatPrice(price: number): string {
     return "Cena niedostępna";
   }
 
-  return POPUP_CURRENCY.format(price);
+  return price + " PLN";
 }
 
 function formatRooms(rooms: number): string {
@@ -332,6 +337,11 @@ function normalizeListingProperties(
     thumbnailUrl: String(properties.thumbnailUrl || PLACEHOLDER_THUMBNAIL),
     city: String(properties.city ?? ""),
     street: String(properties.street ?? ""),
+    saved: Boolean(properties.saved),
+    savedColor:
+      typeof properties.savedColor === "string"
+        ? properties.savedColor
+        : undefined,
   };
 }
 
@@ -377,6 +387,25 @@ function createPopupContent(properties: ListingProperties): HTMLElement {
   const details = document.createElement("div");
   details.className = "listing-popup__details";
 
+  const actions = document.createElement("div");
+  actions.className = "listing-popup__actions";
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "listing-popup__save";
+  saveButton.dataset.popupWishlistSave = "true";
+  saveButton.dataset.listingId = String(properties.id);
+  saveButton.dataset.active = properties.saved ? "true" : "false";
+  if (properties.savedColor) {
+    saveButton.style.backgroundColor = properties.savedColor;
+    saveButton.style.borderColor = properties.savedColor;
+  }
+  saveButton.setAttribute(
+    "aria-label",
+    properties.saved ? "Usuń ofertę z wishlisty" : "Dodaj ofertę do wishlisty",
+  );
+  saveButton.textContent = "♥";
+
   const price = document.createElement("span");
   price.textContent = formatPrice(properties.price);
 
@@ -385,10 +414,12 @@ function createPopupContent(properties: ListingProperties): HTMLElement {
 
   details.appendChild(price);
   details.appendChild(rooms);
+  actions.appendChild(saveButton);
   body.appendChild(eyebrow);
   body.appendChild(title);
   body.appendChild(meta);
   body.appendChild(details);
+  body.appendChild(actions);
   article.appendChild(image);
   article.appendChild(body);
 
@@ -406,9 +437,29 @@ function createListingCard(feature: ListingFeature): HTMLButtonElement {
     `${feature.properties.title}, ${formatPrice(feature.properties.price)}`,
   );
 
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "listing-map__card-save";
+  saveButton.dataset.listingSave = "true";
+  saveButton.dataset.listingId = String(feature.properties.id);
+  saveButton.dataset.active = feature.properties.saved ? "true" : "false";
+  if (feature.properties.savedColor) {
+    saveButton.style.backgroundColor = feature.properties.savedColor;
+    saveButton.style.borderColor = feature.properties.savedColor;
+  }
+  saveButton.setAttribute(
+    "aria-label",
+    feature.properties.saved
+      ? "Usuń ofertę z wishlisty"
+      : "Dodaj ofertę do wishlisty",
+  );
+  saveButton.textContent = "♥";
+
   const eyebrow = document.createElement("div");
   eyebrow.className = "listing-map__card-eyebrow";
-  eyebrow.textContent = formatTransactionType(feature.properties.transactionType);
+  eyebrow.textContent = formatTransactionType(
+    feature.properties.transactionType,
+  );
 
   const title = document.createElement("h3");
   title.className = "listing-map__card-title";
@@ -432,6 +483,7 @@ function createListingCard(feature: ListingFeature): HTMLButtonElement {
     feature.properties.city || "Polska"
   }`;
 
+  card.appendChild(saveButton);
   card.appendChild(eyebrow);
   card.appendChild(title);
   card.appendChild(meta);
@@ -631,8 +683,32 @@ export function mountListingMap(root: HTMLElement): () => void {
   const listSummary = root.querySelector<HTMLElement>(
     "[data-listing-list-summary]",
   );
-  const drawToggle = root.querySelector<HTMLButtonElement>("[data-draw-toggle]");
-  const clearDrawing = root.querySelector<HTMLButtonElement>("[data-clear-drawing]");
+  const wishlistDialog = root.querySelector<HTMLDialogElement>(
+    "[data-wishlist-dialog]",
+  );
+  const wishlistOptions = root.querySelector<HTMLElement>(
+    "[data-wishlist-options]",
+  );
+  const wishlistSummary = root.querySelector<HTMLElement>(
+    "[data-wishlist-dialog-summary]",
+  );
+  const wishlistNote = root.querySelector<HTMLElement>(
+    "[data-wishlist-dialog-note]",
+  );
+  const wishlistNewName = root.querySelector<HTMLInputElement>(
+    "[data-wishlist-new-name]",
+  );
+  const wishlistNewColor = root.querySelector(
+    "[data-wishlist-new-color]",
+  ) as HTMLSelectElement | null;
+  const wishlistCreateButton = root.querySelector<HTMLButtonElement>(
+    "[data-wishlist-create-button]",
+  );
+  const drawToggle =
+    root.querySelector<HTMLButtonElement>("[data-draw-toggle]");
+  const clearDrawing = root.querySelector<HTMLButtonElement>(
+    "[data-clear-drawing]",
+  );
   const drawingOverlay = root.querySelector<HTMLElement>(
     "[data-listing-map-drawing-overlay]",
   );
@@ -654,12 +730,13 @@ export function mountListingMap(root: HTMLElement): () => void {
   const initialCenter = parseCenter(root.dataset.initialCenter);
   const initialBounds = parseBounds(root.dataset.initialBounds);
   const initialZoom = parseZoom(root.dataset.initialZoom);
+  const apiBaseUrl = root.dataset.apiBaseUrl || DEFAULT_API_BASE_URL;
+  const isAuthenticated = root.dataset.authenticated === "true";
   const pmtilesUrl = root.dataset.pmtilesUrl || DEFAULT_PMTILES_URL;
   const listingsApiUrl =
     root.dataset.listingsApiUrl || DEFAULT_LISTINGS_API_URL;
   const drawToSearchEnabled =
-    root.dataset.enableDrawToSearch === "true" &&
-    drawControls !== null;
+    root.dataset.enableDrawToSearch === "true" && drawControls !== null;
 
   acquirePmtilesProtocol();
 
@@ -673,7 +750,13 @@ export function mountListingMap(root: HTMLElement): () => void {
   let drawScreenPoints: Array<[number, number]> = [];
   let drawCoordinates: DrawPoint[] = [];
   let activeSearchPolygon: SearchPolygon | null = null;
+  let activeWishlistListing: ListingProperties | null = null;
+  let savedListingIds = new Set<number>();
+  let savedListingColors = new Map<number, string>();
+  let wishlists: Wishlist[] = [];
+  let wishlistActionInFlight = false;
   const featuresById = new Map<number, ListingFeature>();
+  const visiblePriceMarkers = new Map<number, maplibregl.Marker>();
 
   const map = new maplibregl.Map({
     container: canvas,
@@ -776,6 +859,267 @@ export function mountListingMap(root: HTMLElement): () => void {
     setActiveListing(activeListingId);
   };
 
+  const syncCardSavedStates = () => {
+    listItems
+      .querySelectorAll<HTMLElement>("[data-listing-save]")
+      .forEach((element) => {
+        const listingId = Number(element.dataset.listingId);
+        const isSaved =
+          Number.isFinite(listingId) && savedListingIds.has(listingId);
+        const savedColor = Number.isFinite(listingId)
+          ? savedListingColors.get(listingId)
+          : undefined;
+        syncWishlistButtonState(element, isSaved, savedColor);
+      });
+  };
+
+  const applySavedFlags = (
+    features: ListingFeatureCollection,
+  ): ListingFeatureCollection =>
+    applyWishlistStateToFeatures(features, savedListingIds, savedListingColors);
+
+  const updateMapSavedState = () => {
+    const source = getListingsSource(map);
+    if (!source) {
+      syncCardSavedStates();
+      return;
+    }
+
+    const currentData = (source as { _data?: unknown })._data as
+      | ListingFeatureCollection
+      | undefined;
+    if (currentData?.type === "FeatureCollection") {
+      source.setData(applySavedFlags(currentData));
+    }
+    syncCardSavedStates();
+    window.requestAnimationFrame(() => {
+      renderVisiblePriceMarkers();
+    });
+  };
+
+  const clearPriceMarkers = () => {
+    visiblePriceMarkers.forEach((marker) => marker.remove());
+    visiblePriceMarkers.clear();
+  };
+
+  const renderVisiblePriceMarkers = () => {
+    if (!map.isStyleLoaded()) {
+      return;
+    }
+
+    const rendered = map.queryRenderedFeatures(undefined, {
+      layers: [UNCLUSTERED_LAYER_ID],
+    });
+    const nextIds = new Set<number>();
+
+    for (const renderedFeature of rendered) {
+      const properties = getFeatureProperties(renderedFeature);
+      const coordinates = getFeatureCoordinates(renderedFeature);
+
+      if (!properties || !coordinates || nextIds.has(properties.id)) {
+        continue;
+      }
+
+      nextIds.add(properties.id);
+      const existingMarker = visiblePriceMarkers.get(properties.id);
+      if (existingMarker) {
+        const element = existingMarker.getElement() as HTMLButtonElement;
+        element.dataset.saved = properties.saved ? "true" : "false";
+        if (properties.saved && properties.savedColor) {
+          element.style.backgroundColor = properties.savedColor;
+          element.style.borderColor = properties.savedColor;
+          element.style.color = "#ffffff";
+        } else {
+          element.style.backgroundColor = "";
+          element.style.borderColor = "";
+          element.style.color = "";
+        }
+        existingMarker.setLngLat(coordinates);
+        continue;
+      }
+
+      const marker = new maplibregl.Marker({
+        element: createWishlistPriceMarker(
+          properties,
+          `${properties.price.toLocaleString("pl-PL")}`,
+          () => {
+            const feature = featuresById.get(properties.id);
+            openListingPopup(feature);
+          },
+        ),
+        anchor: "center",
+      })
+        .setLngLat(coordinates)
+        .addTo(map);
+
+      visiblePriceMarkers.set(properties.id, marker);
+    }
+
+    for (const [listingId, marker] of visiblePriceMarkers.entries()) {
+      if (!nextIds.has(listingId)) {
+        marker.remove();
+        visiblePriceMarkers.delete(listingId);
+      }
+    }
+  };
+
+  const syncWishlistDialogNote = (message: string | null) => {
+    if (!wishlistNote) {
+      return;
+    }
+
+    wishlistNote.hidden = !message;
+    wishlistNote.textContent = message ?? "";
+  };
+
+  const setWishlistDialogBusy = (busy: boolean, message?: string) => {
+    wishlistActionInFlight = busy;
+    wishlistDialog?.toggleAttribute("data-busy", busy);
+    wishlistCreateButton && (wishlistCreateButton.disabled = busy);
+    wishlistOptions
+      ?.querySelectorAll<HTMLButtonElement>("[data-wishlist-id]")
+      .forEach((button) => {
+        button.disabled = busy;
+      });
+
+    if (busy) {
+      syncWishlistDialogNote(message ?? "Zapisywanie zmian...");
+    }
+  };
+
+  const emitCurrentWishlistState = () => {
+    if (isAuthenticated) {
+      emitWishlistChanged({
+        mode: "user",
+        savedListingIds: Array.from(savedListingIds),
+        wishlists,
+        guestWishlist: null,
+      });
+      return;
+    }
+
+    const guestWishlist = readGuestWishlist(GUEST_WISHLIST_STORAGE_KEY);
+    emitWishlistChanged({
+      mode: "guest",
+      savedListingIds: guestWishlist.listingIds,
+      wishlists: [guestWishlistToWishlist(readGuestWishlist(GUEST_WISHLIST_STORAGE_KEY))],
+      guestWishlist,
+    });
+  };
+
+  const reloadWishlists = async () => {
+    if (isAuthenticated) {
+      wishlists = await fetchWishlistsCollection(apiBaseUrl);
+      savedListingIds = new Set(getSavedListingIdsFromWishlists(wishlists));
+      savedListingColors = getWishlistMarkerColors(wishlists);
+    } else {
+      const guestWishlist = readGuestWishlist(GUEST_WISHLIST_STORAGE_KEY);
+      savedListingIds = new Set(guestWishlist.listingIds);
+      savedListingColors = new Map<number, string>();
+      for (const listingId of guestWishlist.listingIds) {
+        savedListingColors.set(
+          listingId,
+          getWishlistSwatch(guestWishlist.color),
+        );
+      }
+    }
+
+    updateMapSavedState();
+  };
+
+  const closeWishlistDialog = () => {
+    syncWishlistDialogNote(null);
+    activeWishlistListing = null;
+    if (wishlistDialog?.open) {
+      wishlistDialog.close();
+    }
+  };
+
+  const renderWishlistOptions = () => {
+    if (!wishlistOptions || !wishlistSummary) {
+      return;
+    }
+
+    wishlistOptions.replaceChildren();
+
+    if (!activeWishlistListing) {
+      wishlistSummary.textContent =
+        "Wybierz ofertę, aby zarządzać wishlistami.";
+      return;
+    }
+
+    wishlistSummary.textContent = activeWishlistListing.title;
+    const listingId = activeWishlistListing.id;
+
+    for (const wishlist of wishlists) {
+      const hasListing = wishlist.items.some(
+        (item) => item.listing_id === listingId,
+      );
+
+      const option = document.createElement("div");
+      option.className = "listing-map__wishlist-option";
+
+      const main = document.createElement("div");
+      main.className = "listing-map__wishlist-option-main";
+
+      const swatch = document.createElement("span");
+      swatch.className = "listing-map__wishlist-swatch";
+      swatch.style.backgroundColor = getWishlistSwatch(wishlist.color);
+
+      const labels = document.createElement("div");
+      const label = document.createElement("p");
+      label.className = "listing-map__wishlist-option-label";
+      label.textContent = wishlist.name;
+      const meta = document.createElement("p");
+      meta.className = "listing-map__wishlist-option-meta";
+      meta.textContent = `${wishlist.items.length} ofert`;
+      labels.appendChild(label);
+      labels.appendChild(meta);
+
+      main.appendChild(swatch);
+      main.appendChild(labels);
+
+      const toggleButton = document.createElement("button");
+      toggleButton.type = "button";
+      toggleButton.className = "listing-map__wishlist-toggle";
+      toggleButton.dataset.active = hasListing ? "true" : "false";
+      toggleButton.dataset.wishlistId = String(wishlist.id);
+      toggleButton.textContent = hasListing ? "Usuń" : "Dodaj";
+
+      option.appendChild(main);
+      option.appendChild(toggleButton);
+      wishlistOptions.appendChild(option);
+    }
+  };
+
+  const openWishlistDialog = async (properties: ListingProperties) => {
+    activeWishlistListing = properties;
+    syncWishlistDialogNote(null);
+
+    if (!isAuthenticated) {
+      if (guestWishlistHasListing(GUEST_WISHLIST_STORAGE_KEY, properties.id)) {
+        removeGuestWishlistListing(GUEST_WISHLIST_STORAGE_KEY, properties.id);
+      } else {
+        upsertGuestWishlistListing(
+          GUEST_WISHLIST_STORAGE_KEY,
+          toWishlistListingSummary(properties),
+        );
+      }
+
+      await reloadWishlists();
+      renderWishlistOptions();
+      emitCurrentWishlistState();
+      if (activePopup) {
+        activePopup.remove();
+      }
+      return;
+    }
+
+    await reloadWishlists();
+    renderWishlistOptions();
+    wishlistDialog?.showModal();
+  };
+
   const openListingPopup = (
     feature: MapGeoJSONFeature | ListingFeature | undefined,
     referenceLng?: number,
@@ -806,6 +1150,16 @@ export function mountListingMap(root: HTMLElement): () => void {
       .setLngLat(popupCoordinates)
       .setDOMContent(createPopupContent(properties))
       .addTo(map);
+
+    const popupElement = popup.getElement();
+    const popupSaveButton = popupElement.querySelector<HTMLButtonElement>(
+      "[data-popup-wishlist-save]",
+    );
+    popupSaveButton?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void openWishlistDialog(properties);
+    });
 
     popup.on("close", () => {
       if (activePopup === popup) {
@@ -918,7 +1272,9 @@ export function mountListingMap(root: HTMLElement): () => void {
         throw new Error(`Listing fetch failed with ${response.status}`);
       }
 
-      const payload = normalizeFeatureCollection(await response.json());
+      const payload = applySavedFlags(
+        normalizeFeatureCollection(await response.json()),
+      );
       featuresById.clear();
       for (const feature of payload.features) {
         featuresById.set(feature.properties.id, feature);
@@ -1155,6 +1511,7 @@ export function mountListingMap(root: HTMLElement): () => void {
       return;
     }
 
+    renderVisiblePriceMarkers();
     refreshListings();
   };
 
@@ -1283,9 +1640,9 @@ export function mountListingMap(root: HTMLElement): () => void {
       filter: ["!", ["has", "point_count"]],
       paint: {
         "circle-color": "#201913",
-        "circle-radius": 7,
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#ffffff",
+        "circle-radius": 1,
+        "circle-opacity": 0,
+        "circle-stroke-width": 0,
       },
     });
 
@@ -1310,13 +1667,35 @@ export function mountListingMap(root: HTMLElement): () => void {
       );
     }
 
+    await reloadWishlists();
     await fetchListings();
+    renderVisiblePriceMarkers();
     map.on("moveend", handleMoveEnd);
   };
 
   const handleListClick = (event: Event) => {
     const target = event.target;
     if (!(target instanceof Element)) {
+      return;
+    }
+
+    const saveButton = target.closest<HTMLElement>("[data-listing-save]");
+    if (saveButton) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const listingId = Number(saveButton.dataset.listingId);
+      if (!Number.isFinite(listingId)) {
+        return;
+      }
+
+      const feature = featuresById.get(listingId);
+      const properties = getFeatureProperties(feature);
+      if (!properties) {
+        return;
+      }
+
+      void openWishlistDialog(properties);
       return;
     }
 
@@ -1347,17 +1726,126 @@ export function mountListingMap(root: HTMLElement): () => void {
     openListingPopup(feature);
   };
 
+  const handleWishlistOptionsClick = async (event: Event) => {
+    const target = event.target;
+    if (
+      !(target instanceof HTMLElement) ||
+      !activeWishlistListing ||
+      wishlistActionInFlight
+    ) {
+      return;
+    }
+
+    const button = target.closest<HTMLButtonElement>("[data-wishlist-id]");
+    if (!button) {
+      return;
+    }
+
+    const wishlistId = Number(button.dataset.wishlistId);
+    if (!Number.isFinite(wishlistId)) {
+      return;
+    }
+
+    const wishlist = wishlists.find((item) => item.id === wishlistId);
+    if (!wishlist) {
+      return;
+    }
+
+    const listingId = activeWishlistListing.id;
+    const existingItem = wishlist.items.find(
+      (item) => item.listing_id === listingId,
+    );
+
+    syncWishlistDialogNote(null);
+
+    try {
+      setWishlistDialogBusy(true, "Zapisywanie wyboru wishlisty...");
+      if (existingItem) {
+        await removeWishlistItem(apiBaseUrl, wishlistId, existingItem.id);
+      } else {
+        await addWishlistItem(apiBaseUrl, wishlistId, listingId);
+      }
+
+      await reloadWishlists();
+      renderWishlistOptions();
+      emitCurrentWishlistState();
+    } catch (error) {
+      syncWishlistDialogNote(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się zapisać wishlisty.",
+      );
+    } finally {
+      setWishlistDialogBusy(false);
+    }
+  };
+
+  const handleWishlistCreateClick = async () => {
+    if (!wishlistNewName || !wishlistNewColor || wishlistActionInFlight) {
+      return;
+    }
+
+    const name = wishlistNewName.value.trim();
+    if (!name) {
+      syncWishlistDialogNote("Podaj nazwę nowej wishlisty.");
+      return;
+    }
+
+    try {
+      setWishlistDialogBusy(true, "Tworzenie wishlisty...");
+      const createdWishlist = await createWishlist(apiBaseUrl, {
+        name,
+        color: wishlistNewColor.value as WishlistColor,
+      });
+      if (activeWishlistListing) {
+        const listingId = activeWishlistListing.id;
+        await addWishlistItem(apiBaseUrl, createdWishlist.id, listingId);
+      }
+      wishlistNewName.value = "";
+      wishlistNewColor.value = "sand";
+      await reloadWishlists();
+      renderWishlistOptions();
+      emitCurrentWishlistState();
+      syncWishlistDialogNote("Nowa wishlista została utworzona.");
+    } catch (error) {
+      syncWishlistDialogNote(
+        error instanceof Error
+          ? error.message
+          : "Nie udało się utworzyć wishlisty.",
+      );
+    } finally {
+      setWishlistDialogBusy(false);
+    }
+  };
+
+  const wishlistOptionsListener = (event: Event) => {
+    void handleWishlistOptionsClick(event);
+  };
+
+  const wishlistCreateListener = () => {
+    void handleWishlistCreateClick();
+  };
+
   listItems.addEventListener("click", handleListClick);
+  wishlistOptions?.addEventListener("click", wishlistOptionsListener);
+  wishlistCreateButton?.addEventListener("click", wishlistCreateListener);
+  wishlistDialog?.addEventListener("close", closeWishlistDialog);
   map.on("load", handleLoad);
   map.on("error", handleMapError);
 
   if (drawToSearchEnabled && drawControls) {
     drawControls.drawToggle.addEventListener("click", handleDrawToggleClick);
-    drawControls.clearDrawing.addEventListener("click", handleClearDrawingClick);
+    drawControls.clearDrawing.addEventListener(
+      "click",
+      handleClearDrawingClick,
+    );
     drawControls.drawingOverlay.addEventListener("pointerdown", startDrawing);
     drawControls.drawingOverlay.addEventListener("pointermove", extendDrawing);
     drawControls.drawingOverlay.addEventListener("pointerup", finishDrawing);
-    drawControls.drawingOverlay.addEventListener("pointercancel", finishDrawing);
+    drawControls.drawingOverlay.addEventListener(
+      "pointercancel",
+      finishDrawing,
+    );
     window.addEventListener("keydown", handleWindowKeydown);
     syncDrawUi();
   }
@@ -1373,6 +1861,7 @@ export function mountListingMap(root: HTMLElement): () => void {
     activePopup?.remove();
     clearPointerCursor();
     setMapInteractionsEnabled(true);
+    clearPriceMarkers();
 
     map.off("load", handleLoad);
     map.off("error", handleMapError);
@@ -1384,14 +1873,36 @@ export function mountListingMap(root: HTMLElement): () => void {
     map.off("mouseenter", UNCLUSTERED_LAYER_ID, setPointerCursor);
     map.off("mouseleave", UNCLUSTERED_LAYER_ID, clearPointerCursor);
     listItems.removeEventListener("click", handleListClick);
+    wishlistOptions?.removeEventListener("click", wishlistOptionsListener);
+    wishlistCreateButton?.removeEventListener("click", wishlistCreateListener);
+    wishlistOptions?.replaceChildren();
+    wishlistDialog?.removeEventListener("close", closeWishlistDialog);
 
     if (drawToSearchEnabled && drawControls) {
-      drawControls.drawToggle.removeEventListener("click", handleDrawToggleClick);
-      drawControls.clearDrawing.removeEventListener("click", handleClearDrawingClick);
-      drawControls.drawingOverlay.removeEventListener("pointerdown", startDrawing);
-      drawControls.drawingOverlay.removeEventListener("pointermove", extendDrawing);
-      drawControls.drawingOverlay.removeEventListener("pointerup", finishDrawing);
-      drawControls.drawingOverlay.removeEventListener("pointercancel", finishDrawing);
+      drawControls.drawToggle.removeEventListener(
+        "click",
+        handleDrawToggleClick,
+      );
+      drawControls.clearDrawing.removeEventListener(
+        "click",
+        handleClearDrawingClick,
+      );
+      drawControls.drawingOverlay.removeEventListener(
+        "pointerdown",
+        startDrawing,
+      );
+      drawControls.drawingOverlay.removeEventListener(
+        "pointermove",
+        extendDrawing,
+      );
+      drawControls.drawingOverlay.removeEventListener(
+        "pointerup",
+        finishDrawing,
+      );
+      drawControls.drawingOverlay.removeEventListener(
+        "pointercancel",
+        finishDrawing,
+      );
       window.removeEventListener("keydown", handleWindowKeydown);
     }
 

@@ -16,48 +16,6 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
-pub struct ListWishlistsQuery {
-    pub page: Option<u64>,
-    pub per_page: Option<u64>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateWishlistRequest {
-    pub name: String,
-    pub is_shared: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UpdateWishlistRequest {
-    pub name: Option<String>,
-    pub is_shared: Option<bool>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AddWishlistItemRequest {
-    pub listing_id: i64,
-    pub user_notes: Option<String>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct WishlistItemResponse {
-    pub id: i64,
-    pub listing_id: i64,
-    pub added_at: String,
-    pub user_notes: String,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct WishlistResponse {
-    pub id: i64,
-    pub user_id: i64,
-    pub name: String,
-    pub is_shared: bool,
-    pub created_at: String,
-    pub items: Vec<WishlistItemResponse>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ListConversationsQuery {
     pub page: Option<u64>,
     pub per_page: Option<u64>,
@@ -93,210 +51,6 @@ pub struct ConversationResponse {
     pub created_at: String,
     pub updated_at: String,
     pub last_message: Option<MessageResponse>,
-}
-
-pub async fn list_wishlists_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Query(query): Query<ListWishlistsQuery>,
-) -> Result<Json<PaginatedResponse<WishlistResponse>>, ApiError> {
-    require_buyer_or_admin(&auth_user)?;
-    let pagination = PaginationQuery {
-        page: query.page,
-        per_page: query.per_page,
-    }
-    .normalize();
-
-    let total_row = sqlx::query("SELECT COUNT(*) AS total FROM wishlists WHERE user_id = $1")
-        .bind(auth_user.id)
-        .fetch_one(&state.db)
-        .await?;
-    let total: i64 = total_row.try_get("total").map_err(ApiError::from)?;
-
-    let rows = sqlx::query(
-        r#"
-        SELECT id
-        FROM wishlists
-        WHERE user_id = $1
-        ORDER BY id ASC
-        LIMIT $2 OFFSET $3
-        "#,
-    )
-    .bind(auth_user.id)
-    .bind(pagination.limit)
-    .bind(pagination.offset)
-    .fetch_all(&state.db)
-    .await?;
-
-    let mut items = Vec::with_capacity(rows.len());
-    for row in rows {
-        let wishlist_id: i64 = row.try_get("id").map_err(ApiError::from)?;
-        items.push(
-            load_wishlist(&state.db, wishlist_id)
-                .await?
-                .ok_or_else(|| {
-                    ApiError::internal("wishlist_load_failed", "Wishlist disappeared mid-request")
-                })?,
-        );
-    }
-
-    Ok(Json(PaginatedResponse::new(
-        items,
-        pagination,
-        total as u64,
-    )))
-}
-
-pub async fn create_wishlist_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Json(payload): Json<CreateWishlistRequest>,
-) -> Result<(StatusCode, Json<WishlistResponse>), ApiError> {
-    require_buyer_or_admin(&auth_user)?;
-    let row = sqlx::query(
-        r#"
-        INSERT INTO wishlists (user_id, name, is_shared)
-        VALUES ($1, $2, $3)
-        RETURNING id
-        "#,
-    )
-    .bind(auth_user.id)
-    .bind(required_text(&payload.name, "name")?)
-    .bind(payload.is_shared.unwrap_or(false))
-    .fetch_one(&state.db)
-    .await?;
-    let wishlist_id: i64 = row.try_get("id").map_err(ApiError::from)?;
-
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::internal("wishlist_not_found", "Wishlist creation failed"))?;
-
-    Ok((StatusCode::CREATED, Json(wishlist)))
-}
-
-pub async fn get_wishlist_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Path(wishlist_id): Path<i64>,
-) -> Result<Json<WishlistResponse>, ApiError> {
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("wishlist_not_found", "Wishlist was not found"))?;
-    ensure_wishlist_access(&auth_user, &wishlist)?;
-    Ok(Json(wishlist))
-}
-
-pub async fn update_wishlist_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Path(wishlist_id): Path<i64>,
-    Json(payload): Json<UpdateWishlistRequest>,
-) -> Result<Json<WishlistResponse>, ApiError> {
-    let current = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("wishlist_not_found", "Wishlist was not found"))?;
-    ensure_wishlist_access(&auth_user, &current)?;
-
-    sqlx::query(
-        r#"
-        UPDATE wishlists
-        SET name = $1,
-            is_shared = $2
-        WHERE id = $3
-        "#,
-    )
-    .bind(payload.name.unwrap_or(current.name))
-    .bind(payload.is_shared.unwrap_or(current.is_shared))
-    .bind(wishlist_id)
-    .execute(&state.db)
-    .await?;
-
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::internal("wishlist_not_found", "Wishlist update failed"))?;
-    Ok(Json(wishlist))
-}
-
-pub async fn delete_wishlist_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Path(wishlist_id): Path<i64>,
-) -> Result<StatusCode, ApiError> {
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("wishlist_not_found", "Wishlist was not found"))?;
-    ensure_wishlist_access(&auth_user, &wishlist)?;
-
-    sqlx::query("DELETE FROM wishlists WHERE id = $1")
-        .bind(wishlist_id)
-        .execute(&state.db)
-        .await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn add_wishlist_item_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Path(wishlist_id): Path<i64>,
-    Json(payload): Json<AddWishlistItemRequest>,
-) -> Result<(StatusCode, Json<WishlistItemResponse>), ApiError> {
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("wishlist_not_found", "Wishlist was not found"))?;
-    ensure_wishlist_access(&auth_user, &wishlist)?;
-    if load_listing(&state.db, payload.listing_id).await?.is_none() {
-        return Err(ApiError::not_found(
-            "listing_not_found",
-            "Listing was not found",
-        ));
-    }
-
-    let result = sqlx::query(
-        r#"
-        INSERT INTO wishlist_items (wishlist_id, listing_id, user_notes)
-        VALUES ($1, $2, $3)
-        RETURNING id, listing_id, added_at::text AS added_at, user_notes
-        "#,
-    )
-    .bind(wishlist_id)
-    .bind(payload.listing_id)
-    .bind(payload.user_notes.unwrap_or_default())
-    .fetch_one(&state.db)
-    .await;
-
-    let row = match result {
-        Ok(row) => row,
-        Err(sqlx::Error::Database(database_error))
-            if database_error.code().as_deref() == Some("23505") =>
-        {
-            return Err(ApiError::conflict(
-                "wishlist_item_exists",
-                "Listing already exists in this wishlist",
-            ));
-        }
-        Err(error) => return Err(error.into()),
-    };
-
-    Ok((StatusCode::CREATED, Json(map_wishlist_item_row(row)?)))
-}
-
-pub async fn delete_wishlist_item_handler(
-    State(state): State<AppState>,
-    auth_user: AuthenticatedUser,
-    Path((wishlist_id, item_id)): Path<(i64, i64)>,
-) -> Result<StatusCode, ApiError> {
-    let wishlist = load_wishlist(&state.db, wishlist_id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("wishlist_not_found", "Wishlist was not found"))?;
-    ensure_wishlist_access(&auth_user, &wishlist)?;
-
-    sqlx::query("DELETE FROM wishlist_items WHERE id = $1 AND wishlist_id = $2")
-        .bind(item_id)
-        .bind(wishlist_id)
-        .execute(&state.db)
-        .await?;
-
-    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn list_conversations_handler(
@@ -491,50 +245,6 @@ pub async fn create_message_handler(
     Ok((StatusCode::CREATED, Json(message)))
 }
 
-async fn load_wishlist(
-    pool: &PgPool,
-    wishlist_id: i64,
-) -> Result<Option<WishlistResponse>, ApiError> {
-    let row = sqlx::query(
-        r#"
-        SELECT id, user_id, name, is_shared, created_at::text AS created_at
-        FROM wishlists
-        WHERE id = $1
-        "#,
-    )
-    .bind(wishlist_id)
-    .fetch_optional(pool)
-    .await?;
-
-    let Some(row) = row else {
-        return Ok(None);
-    };
-
-    let items = sqlx::query(
-        r#"
-        SELECT id, listing_id, added_at::text AS added_at, user_notes
-        FROM wishlist_items
-        WHERE wishlist_id = $1
-        ORDER BY added_at DESC, id DESC
-        "#,
-    )
-    .bind(wishlist_id)
-    .fetch_all(pool)
-    .await?
-    .into_iter()
-    .map(map_wishlist_item_row)
-    .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(Some(WishlistResponse {
-        id: row.try_get("id").map_err(ApiError::from)?,
-        user_id: row.try_get("user_id").map_err(ApiError::from)?,
-        name: row.try_get("name").map_err(ApiError::from)?,
-        is_shared: row.try_get("is_shared").map_err(ApiError::from)?,
-        created_at: row.try_get("created_at").map_err(ApiError::from)?,
-        items,
-    }))
-}
-
 async fn load_conversation(
     pool: &PgPool,
     conversation_id: i64,
@@ -668,20 +378,6 @@ async fn ensure_conversation_participant(
     }
 }
 
-fn ensure_wishlist_access(
-    auth_user: &AuthenticatedUser,
-    wishlist: &WishlistResponse,
-) -> Result<(), ApiError> {
-    if is_platform_admin(auth_user) || auth_user.id == wishlist.user_id {
-        Ok(())
-    } else {
-        Err(ApiError::forbidden(
-            "forbidden",
-            "You do not have permission to access this wishlist",
-        ))
-    }
-}
-
 fn require_buyer_or_admin(auth_user: &AuthenticatedUser) -> Result<(), ApiError> {
     if is_platform_admin(auth_user) || auth_user.business_role == BusinessRole::Buyer {
         Ok(())
@@ -691,15 +387,6 @@ fn require_buyer_or_admin(auth_user: &AuthenticatedUser) -> Result<(), ApiError>
             "This action is only available to buyers",
         ))
     }
-}
-
-fn map_wishlist_item_row(row: sqlx::postgres::PgRow) -> Result<WishlistItemResponse, ApiError> {
-    Ok(WishlistItemResponse {
-        id: row.try_get("id").map_err(ApiError::from)?,
-        listing_id: row.try_get("listing_id").map_err(ApiError::from)?,
-        added_at: row.try_get("added_at").map_err(ApiError::from)?,
-        user_notes: row.try_get("user_notes").map_err(ApiError::from)?,
-    })
 }
 
 fn map_message_row(row: sqlx::postgres::PgRow) -> Result<MessageResponse, ApiError> {
