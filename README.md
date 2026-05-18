@@ -1,4 +1,6 @@
-# god monorepo
+# WIP
+
+# monorepo
 
 Monorepo dla stosu:
 
